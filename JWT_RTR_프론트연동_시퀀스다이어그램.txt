@@ -70,10 +70,11 @@ Redis에서 해당 Refresh Token을 삭제하여 더 이상 사용되지 않도�
 사용자가 로그아웃하면 프론트엔드는 로그아웃 API 호출.
 백엔드는 Redis에서 Refresh Token을 삭제하여 강제 로그아웃 처리.
 프론트엔드는 Access Token을 메모리에서 삭제.
-🚀 결론
-✅ Access Token은 짧게 유지하면서 메모리에서만 관리하여 보안을 강화.
-✅ Refresh Token은 HttpOnly Secure 쿠키를 이용하여 보관하며, Redis에서 관리.
-✅ Refresh Token이 탈취되더라도 Redis 검증을 통해 재사용 방지 (RTR 전략).
-✅ API 요청 시 Access Token이 만료되면 Refresh Token을 이용해 새로운 Access Token 자동 발급.
-✅ Refresh Token이 만료되거나 이상 징후가 감지되면 강제 로그아웃 처리.
+
+* 요점 *
+Access Token은 짧게 유지하면서 메모리에서만 관리하여 보안을 강화.
+Refresh Token은 HttpOnly Secure 쿠키를 이용하여 보관하며, Redis에서 관리.
+Refresh Token이 탈취되더라도 Redis 검증을 통해 재사용 방지 (RTR 전략).
+API 요청 시 Access Token이 만료되면 Refresh Token을 이용해 새로운 Access Token 자동 발급.
+Refresh Token이 만료되거나 이상 징후가 감지되면 강제 로그아웃 처리.
 
