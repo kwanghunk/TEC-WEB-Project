@@ -1,0 +1,98 @@
+package com.tecProject.tec.auth;
+
+import java.util.Date;
+
+import org.springframework.stereotype.Component;
+
+import io.jsonwebtoken.Claims;
+import jakarta.servlet.http.HttpServletRequest;
+
+@Component
+public class IpUtil {
+	
+	private final JWTUtil jwtUtil;
+	
+    public IpUtil(JWTUtil jwtUtil) {
+        this.jwtUtil = jwtUtil;
+    }
+	
+    // 클라이언트의 실제 IP 주소를 반환 (프록시 및 IPv6 고려)
+	public String getClientIp(HttpServletRequest request) {
+		String[] headers = {
+				"X-Forwarded-For", // 프록시 서버 뒤의 실제 클라이언트 IP
+				"Proxy-Client-IP", // Proxy-Client-IP 헤더 확인
+				"WL-Proxy-Client-IP", // WebLogic Proxy-Client-IP
+				"HTTP_X_FORWARDED_FOR", // 일부 프록시 환경
+				"HTTP_CLIENT_IP" // 일부 프록시 호나경
+		};
+		
+		String ipAddress = null;
+		
+		for (String header : headers) {
+			String ipList = request.getHeader(header);
+			if (ipList != null && !ipList.isEmpty() && !"unknown".equalsIgnoreCase(ipList)) {
+				ipAddress = ipList.split(",")[0].trim(); // 여러 IP가 있을 경우 첫 번쨰 값 사용
+				break;
+			}
+		}
+		
+		if (ipAddress == null || ipAddress.isEmpty() || "unknown".equalsIgnoreCase(ipAddress)) {
+			ipAddress = request.getRemoteAddr(); // 최종적으로 HttpServletRequest에서 가져옴
+		}
+		
+		// IPv6 Localhost (::1) -> IPv4 127.0.0.1 변환
+		if ("0:0:0:0:0:0:0:1".equals(ipAddress)) {
+			ipAddress = "127.0.0.1";
+		}
+		
+		return ipAddress;
+	}
+	
+	// JWT 토큰에서 사용자 이름 추출
+	public String getUsernameFromToken(HttpServletRequest request) {
+		String token = getTokenFromRequest(request);
+		if (token == null) return "비회원"; // JWT 없으면 비회원 처리
+		
+		try {
+			Claims claims = jwtUtil.parseToken(token);
+			return claims.get("username", String.class);
+		} catch (Exception e) {
+			return "비회원"; // JWT 파싱 실패 시 비회원 처리
+		}
+	}
+	
+	// JWT 토큰에서 사용자 역할(회원/비회원) 추출
+	public String getRoleFromToken(HttpServletRequest request) {
+		String token = getTokenFromRequest(request);
+		if (token == null) return "ROLE_GUEST"; // JWT 없으면 비회원 처리
+		
+		try {
+			Claims claims = jwtUtil.parseToken(token);
+			return claims.get("userType", String.class);
+		} catch (Exception e) {
+			return "ROLE_GUEST"	;
+		}	
+	}
+	
+	// JWT 토큰 만료 여부 확인
+    public boolean isTokenExpired(HttpServletRequest request) {
+        String token = getTokenFromRequest(request);
+        if (token == null) return false; // JWT 없음 → 비회원 처리 (만료된 토큰 없음)
+
+        try {
+            Claims claims = jwtUtil.parseToken(token);
+            return claims.getExpiration().before(new Date());
+        } catch (Exception e) {
+            return false; // 파싱 실패 → 비회원 처리
+        }
+    }
+    
+    // HTTP 요청에서 JWT 토큰 추출
+    private String getTokenFromRequest(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.replace("Bearer ", "");
+        }
+        return null; // JWT 없음 → null 반환
+    }
+}

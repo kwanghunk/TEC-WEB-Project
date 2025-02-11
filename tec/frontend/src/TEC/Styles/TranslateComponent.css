@@ -1,0 +1,54 @@
+/* 번역 버튼 */
+.translate-Btn {
+  font-family: 'Freesentation';
+  color: white;
+  background-color: #6841ea;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 8px 20px;
+  transition: background-color 0.3s ease;
+}
+
+.translate-Btn:hover {
+  background-color: rgb(255, 196, 0);
+}
+
+/* 개발언어 선택 드롭다운 */
+.select-language {
+  font-family: 'Freesentation';
+  color: white;
+  background-color: #6841ea;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  padding: 8px 16px;
+  transition: background-color 0.3s ease;
+}
+
+.select-language:hover {
+  background-color: rgb(255, 196, 0);
+}
+
+/* 번역 영역 */
+.content-mid-translateDiv-left,
+.content-mid-translateDiv-right {
+  border: 2px solid lightgray;
+  padding: 15px;
+  border-radius: 10px;
+  background: white;
+  transition: border-color 0.3s ease;
+}
+
+/* 활성화된 번역 영역 */
+.content-mid-translateDiv-left:focus-within,
+.content-mid-translateDiv-right:focus-within {
+  border-color: #6841ea;
+}
+
+/* 경고 메시지 */
+.alert-danger {
+  background-color: #ffcccc;
+  color: #a94442;
+  font-weight: bold;
+}

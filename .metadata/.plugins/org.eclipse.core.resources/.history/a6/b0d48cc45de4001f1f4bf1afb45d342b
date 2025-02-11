@@ -1,0 +1,77 @@
+package com.tecProject.tec.auth;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.when;
+
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+
+import io.jsonwebtoken.Claims;
+
+public class JwtUtilTest {
+
+	@InjectMocks
+	private JWTUtil jwtUtil;
+	
+	@Mock
+	private StringRedisTemplate redisTemplate;
+	
+	@Mock
+	private ValueOperations<String, String> valueOperations;
+	
+	private String testUsername = "testUser";
+	private String testRole = "ROLE_USER";
+	private String tokenFamily;
+	private String accessToken;
+	private String refreshToken;
+	
+	@BeforeEach
+	void setUp() {
+		MockitoAnnotations.openMocks(this);
+		
+		tokenFamily = UUID.randomUUID().toString();
+		accessToken = jwtUtil.createAccessToken(testUsername, testRole, 1000L * 60 * 15); // 15분
+		refreshToken = jwtUtil.createRefreshToken(testUsername, tokenFamily);
+		
+		when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+	}
+	
+	@Test
+	void testCreateAccessToken() {
+		assertNotNull(accessToken);
+		Claims claims = jwtUtil.parseToken(accessToken);
+		assertEquals(testUsername, claims.get("username"));
+		assertEquals(testRole, claims.get("role"));
+	}
+	
+	@Test
+	void testCreateRefreshToken() {
+		assertNotNull(refreshToken);
+		Claims claims = jwtUtil.parseToken(refreshToken);
+		assertEquals(testUsername, claims.get("username"));
+		assertEquals(tokenFamily, claims.get("tokenFamily"));
+	}
+	
+	@Test
+	void testRefreshTokenValidation() {
+		when(redisTemplate.opsForValue().get(tokenFamily)).thenReturn(refreshToken);
+		
+		assertTrue(jwtUtil.isRefreshTokenValid(refreshToken));
+	}
+	
+	@Test
+	void testExpiredRefreshTokenValidation() {
+		when(redisTemplate.opsForValue().get(tokenFamily)).thenReturn(null); // Redis에서 삭제된 경우
+		
+		assertFalse(jwtUtil.isRefreshTokenValid(refreshToken));
+	}
+}

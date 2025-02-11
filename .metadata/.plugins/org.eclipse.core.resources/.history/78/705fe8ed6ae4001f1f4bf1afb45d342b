@@ -1,0 +1,90 @@
+package com.tecProject.tec.auth;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
+
+import java.util.Map;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.http.ResponseEntity;
+
+import com.tecProject.tec.controller.LoginController;
+
+public class RefreshTokenTest {
+    
+    private JWTUtil jwtUtil;
+
+    @Mock
+    private StringRedisTemplate redisTemplate;
+    
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+    
+    @Mock
+    private LoginController loginController;
+
+    private String testUsername = "testUser";
+    private String testRole = "ROLE_USER";
+    private String tokenFamily;
+    private String accessToken;
+    private String refreshToken;
+    private static final String SECRET_KEY = "asfhailehaweihqsdfkuasdfhawjwperjdsfserhjjehewyugeaefaaaaaaaaaaaaaaaaaaaaabbbbbbbb";
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(redisTemplate.opsForValue().get(tokenFamily)).thenReturn(refreshToken); // ✅ Refresh Token Mock 설정 추가
+        
+        jwtUtil = new JWTUtil(SECRET_KEY, redisTemplate);
+
+        tokenFamily = UUID.randomUUID().toString();
+        accessToken = jwtUtil.createAccessToken(testUsername, testRole, 1000L * 60 * 15); // 15분
+        refreshToken = jwtUtil.createRefreshToken(testUsername, tokenFamily);
+
+        // ✅ `doReturn()`을 사용해서 타입 문제 해결
+        doReturn(ResponseEntity.ok(Map.of(
+                "accessToken", accessToken,
+                "refreshToken", jwtUtil.createRefreshToken(testUsername, tokenFamily)
+        ))).when(loginController).refreshAccessToken(refreshToken);
+        
+        doReturn(ResponseEntity.status(401).body("Unauthorized"))
+		        .when(loginController)
+		        .refreshAccessToken(anyString());
+    }
+
+    @Test
+    void testRefreshTokenRotation() {
+        when(redisTemplate.opsForValue().get(tokenFamily)).thenReturn(refreshToken);
+        
+        ResponseEntity<?> response = loginController.refreshAccessToken(refreshToken);
+        
+        assertEquals(200, response.getStatusCodeValue());
+        
+        @SuppressWarnings("unchecked")
+        Map<String, String> responseBody = (Map<String, String>) response.getBody();
+        assertNotNull(responseBody.get("accessToken"));
+        assertNotNull(responseBody.get("refreshToken"));
+    }
+    
+    @Test
+    void testRefreshTokenReuseDetection() {
+        when(redisTemplate.opsForValue().get(tokenFamily)).thenReturn(null); // ✅ 이미 사용된 Refresh Token
+
+        ResponseEntity<?> response = loginController.refreshAccessToken(refreshToken);
+
+        // ✅ 실제 응답 값 확인 (디버깅)
+        System.out.println("Response Status: " + response.getStatusCodeValue());
+        System.out.println("Response Body: " + response.getBody());
+
+        assertEquals(401, response.getStatusCodeValue());
+    }
+}

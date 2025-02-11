@@ -1,0 +1,113 @@
+/* userSupport 전체 */
+.userSupport-all {
+  max-width: 800px;
+  margin: 0 auto;
+  font-family: 'Freesentation';
+}
+
+/* 제목 글자 */
+.userSupport-title {
+  font-size: 40px;
+  font-weight: bold;
+}  
+
+/* 검색창 */
+.userSupport-search {
+  margin-bottom: 20px;
+  text-align: center; 
+}
+
+/* 검색창 */
+.userSupport-search {
+  width: 80%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 1rem;
+  margin-bottom: 20px;
+}
+
+.userSupport-searchBar button {
+  padding: 8px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.userSupport-searchBar button:hover {
+  background-color: #0056b3;
+  color: white;
+  border-color: #0056b3;
+}
+
+/* userSupport 목록 전체 */
+.userSupport-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* 질문, 답변, 생성일자 전체 */
+.userSupport-item {
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 15px;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  text-align: left;
+}
+.userSupport-item:hover {
+  background-color: #d0d0d0;
+}
+
+/* 질문 */
+.userSupport-inquiryTitle {
+  font-size: 20px;
+  font-weight: bold;
+  color: #007bff;
+}
+
+/* 답변 */
+.userSupport-userId {
+  color: #555;
+}
+
+/* 생성일자 */
+.userSupport-createdAt {
+  font-size: 0.9rem;
+  color: #777;
+}
+
+/* userSupport 등록 폼 전체 */
+.userSupport-form {
+  margin-top: 30px;
+}
+
+/* userSupport 질문, 답변 입력 폼*/
+.userSupport-input {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 1rem;
+}
+
+/* userSupport 등록하기 버튼 */
+.userSupport-submit-button {
+  width: 100%;
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+  .userSupport-submit-button:hover {
+    background-color: #0056b3;
+  }

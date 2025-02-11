@@ -1,0 +1,92 @@
+package com.tecProject.tec.controller;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.tecProject.tec.auth.JWTUtil;
+import com.tecProject.tec.domain.User;
+import com.tecProject.tec.dto.LoginDTO;
+import com.tecProject.tec.service.LoginService;
+
+import io.jsonwebtoken.Claims;
+
+@RestController
+@RequestMapping("/user")
+public class LoginController {
+
+	private final LoginService loginService;
+	private final JWTUtil jwtUtil;
+
+	public LoginController(LoginService loginService, JWTUtil jwtUtil) {
+		this.loginService = loginService;
+		this.jwtUtil = jwtUtil;
+	}
+	
+	@PostMapping("/login")
+	public ResponseEntity<?> login(@RequestBody LoginDTO loginDTO) {
+		try {
+			// 로그인 시 유효한 사용자 인증 수행
+			User user = loginService.authenticateUser(loginDTO);
+			
+			if (user == null) {
+				throw new BadCredentialsException("아이디 또는 비밀번호가 잘못되었습니다.");
+			}
+			
+			// Access Token 및 Refresh Token 생성
+			String tokenFamily = UUID.randomUUID().toString(); // Refresh Token 관리용 고유 ID
+			String accessToken = jwtUtil.createAccessToken(user.getUsername(), user.getUserType(), 1000L * 60 * 15); // 15분
+			String refreshToken = jwtUtil.createRefreshToken(user.getUsername(), tokenFamily);
+			
+			// 응답 데이터 생성
+			Map<String, String> response = new HashMap<>();
+			response.put("accessToken", accessToken);
+			response.put("refreshToken", refreshToken);
+			response.put("username", user.getUsername());
+			response.put("userType", user.getUserType());
+			
+			return ResponseEntity.ok(response);
+		} catch (BadCredentialsException e) {
+			return ResponseEntity.status(401).body("아이디 또는 비밀번호가 잘못되었습니다.");
+		} catch (Exception e) {
+			return ResponseEntity.status(500).body("서버 오류가 발생했습니다.");
+		}
+	}
+	
+	@PostMapping("/refresh")
+	public ResponseEntity<?> refreshAccessToken(
+			@RequestHeader("Refresh-Token") String refreshToken) {
+		if (!jwtUtil.isRefreshTokenValid(refreshToken)) {
+			return ResponseEntity.status(401).body("만료 또는 사용할 수 없는 토큰입니다.");
+		}
+		
+		// Refresh Token 검증 성공 -> 새로운 Access Token 발급
+		Claims claims = jwtUtil.parseToken(refreshToken);
+		String username = claims.get("username", String.class);
+		String userType = claims.get("userType", String.class);
+		String tokenFamily = claims.get("tokenFamily", String.class);
+		
+		// 새로운 Access Token 및 Refresh Token 생성
+		String newAccessToken = jwtUtil.createAccessToken(username, userType, 1000L * 60 * 15); // 15분
+		String newRefreshToken = jwtUtil.createRefreshToken(username, tokenFamily);
+		
+		// 기존 Refresh Token 폐기
+		jwtUtil.revokeRefreshToken(refreshToken);
+		
+		// 새로운 Access Token 및 Refresh Token 반환
+		Map<String, String> response = new HashMap<>();
+		response.put("accessToken", newAccessToken);
+		response.put("refreshToken", newRefreshToken);
+		
+		return ResponseEntity.ok(response);
+	}
+}
+

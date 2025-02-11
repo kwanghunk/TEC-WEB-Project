@@ -1,0 +1,118 @@
+/* FAQ 전체 */
+.faq-all {
+  max-width: 800px;
+  margin: 0 auto;
+  font-family: 'Freesentation';
+}
+
+/* 제목 글자 */
+.faq-title {
+  font-size: 40px;
+  font-weight: bold;
+}  
+
+/* 검색창 */
+.faq-search {
+  margin-bottom: 20px;
+  text-align: center; 
+}
+
+/* 검색창 */
+.faq-search {
+  width: 80%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 1rem;
+  margin-bottom: 20px;
+}
+
+/* FAQ 목록 전체 */
+.faq-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* 질문, 답변, 생성일자 전체 */
+.faq-item {
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  padding: 15px;
+  background-color: #f9f9f9;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  text-align: left;
+}
+
+/* 질문 */
+.faq-question {
+  font-size: 20px;
+  font-weight: bold;
+  color: #007bff;
+}
+
+/* 답변 */
+.faq-answer {
+  color: #555;
+}
+
+/* 생성일자 */
+.faq-date {
+  font-size: 0.9rem;
+  color: #777;
+}
+
+/* 페이지네이션 */
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0;
+}
+
+/* 페이지네이션 버튼 */
+.pagination-button {
+  margin: 0 5px;
+  padding: 5px 10px;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+  .pagination-button.active {
+    background-color: #6841ea;
+    color: white;
+    border-color: #6841ea;
+  }
+
+/* FAQ 등록 폼 전체 */
+.faq-form {
+  margin-top: 30px;
+}
+
+/* FAQ 질문, 답변 입력 폼*/
+.faq-input {
+  width: 100%;
+  padding: 10px;
+  margin: 10px 0;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 1rem;
+}
+
+/* FAQ 등록하기 버튼 */
+.faq-submit-button {
+  width: 100%;
+  padding: 10px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+  .faq-submit-button:hover {
+    background-color: #0056b3;
+  }

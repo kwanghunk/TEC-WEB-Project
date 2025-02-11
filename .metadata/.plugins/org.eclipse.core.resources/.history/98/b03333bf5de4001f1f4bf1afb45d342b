@@ -1,0 +1,5 @@
+package com.tecProject.tec.auth;
+
+public class JwtUtilTest {
+
+}

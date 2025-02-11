@@ -1,0 +1,71 @@
+-- 현재 구현된 JWT RTR 구현기법 --
+
+1. 로그인 요청 시
+백엔드에서 Access Token(AT) 15분, Refresh Token(RT) 1일 생성 및 RT를 Redis에 저장.
+프론트에서 AT는 메모리에 저장, RT는 쿠키에 저장.
+
+2. 일반 API 요청 시 (AT 사용)
+API 요청 시 메모리에 저장된 AT를 헤더에 담아 전송 → 서버에서 검증 후 응답.
+
+3. AT 만료 시 Refresh Token 사용하여 재발급
+AT가 만료되면 RT를 담아 /user/refresh API 요청 →
+서버가 RT 검증 후 새 AT, RT 재발급 → 기존 AT, RT, tokenFamily 삭제 후 Redis에 새 RT 저장 →
+프론트는 새 AT를 메모리에 저장, RT를 쿠키에 저장 → 다시 API 요청 진행.
+
+4. 로그아웃 API 사용 시
+로그아웃 시 모든 토큰과 사용자 정보 제거.
+
+
+-- 현재 구현된 JWT RTR의 보안 강화 기법 --
+O. 악성 공격 시나리오
+1. Access Token 탈취 공격 (XSS, MITM)
+	1-1. 공격 방법
+		1) XSS (Cross-Site Scripting) 공격:
+		- 악성 스크립트를 삽입 후 accessToken을 탈취
+		2) MITM (Man-In-The-Middle) 공격:
+		- 사용자의 요청을 가로채고, accessToken을 탈취
+	1-2. 방어 방법
+		1) Access Token을 메모리에만 유지
+		- localStorage.getItem("accessToken") 사용불가(XSS 공격 방어에 효과적)
+		2) JWT Access Token의 만료 시간을 15분으로 짧게 설정
+		- accessToken이 탈취되더라도, 15분 내 자동 만료
+	1-3. 결론
+		- Access Token 탈취 시 최대 15분 사용
+
+2. Refresh Token 탈취 공격 (Session Fixation, Cookie Theft)
+	2-1. 공격 방법
+		1) 용자의 refreshToken을 탈취 후 지속적으로 새로운 accessToken 생성(로그아웃 전까지)
+	2-2. 방어 방법
+		1) Refresh Token을 HttpOnly Secure 쿠키에 저장
+		- HttpOnly: JavaScript로 접근 불가능 → XSS 공격으로 탈취 불가.
+		- Secure: HTTPS에서만 전송 → MITM 공격 방어
+		2) RTR (Rotating Refresh Token) 적용 → Redis에서 Refresh Token 검증
+		- 이중 사용 감지 (isRefreshTokenValid()에서 Redis 비교)
+		- Refresh Token이 재사용되면 즉시 로그아웃 처리
+		3) 로그아웃 시 Refresh Token을 삭제
+		- 공격자가 탈취한 Refresh Token이 남아있더라도, 로그아웃하면 Redis에서 삭제
+		4) Refresh Token 재사용 감지 시, 해당 사용자의 모든 세션 종료
+	2-3. 결론
+		- Refresh Token을 탈취하더라도 최대 30분 사용(한 번 갱신된 Access Token까지)
+		
+3. Refresh Token을 통한 무차별 대입 공격 (Brute Force Attack)
+	3-1. 공격 방법
+		1) 공격자가 Refresh Token을 대량으로 생성하여, /user/refresh API를 무차별 요청.
+		2) 특정 Refresh Token이 유효하다면, 새로운 Access Token을 발급
+	3-2. 방어 방법
+		1) Redis에서 Refresh Token 검증 (isRefreshTokenValid())
+		- Redis에 저장되지 않은 Refresh Token은 무효화(401 응답 반환)
+		2) Rate Limiting 적용 (/user/refresh API 60초에 5번 이상 요청 시 차단)
+		- /user/refresh API를 짧은 시간 동안 여러 번 요청하면 차단하는 기능
+	3-3. 결론
+		- 4회 이내 유효한 Refresh Token 확인 시 최대 30분 사용(refreshToken 1회 사용한 재발급 된 Token까지 사용한 시간)
+		
+4. CSRF (Cross-Site Request Forgery) 공격
+	4-1. 공격 방법
+		1) 로그인 상태에서 악성 사이트에 방문 시 자동으로 /user/refresh API를 호출하여 새로운 Access Token을 탈취(Refresh Token이 쿠키에 저장되어 있어 발생 가능성 있음)
+	4-2. 방어 방법
+		1) SameSite=Strict 설정 적용 (/user/refresh 요청이 자동 전송되지 않음)
+		2) Access Token을 응답 바디로만 제공하여 쿠키 기반 인증 방어 가능
+	4-3. 결론
+		1) CSRF 공격이 원천 차단
+		2) 다른 사이트에서 Refresh Token을 악용하는 것이 불가능

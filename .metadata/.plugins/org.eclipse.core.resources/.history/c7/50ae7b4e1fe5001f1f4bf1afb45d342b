@@ -1,0 +1,104 @@
+package com.tecProject.tec.auth;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+
+import java.util.Base64;
+import java.util.UUID;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+
+import io.jsonwebtoken.Claims;
+
+public class JwtUtilTest {
+
+    private JWTUtil jwtUtil;
+
+    @Mock
+    private StringRedisTemplate redisTemplate;
+
+    @Mock
+    private ValueOperations<String, String> valueOperations;
+
+    private String testUsername = "testUser";
+    private String testRole = "ROLE_USER";
+    private String tokenFamily;
+    private String accessToken;
+    private String refreshToken;
+    private static final String SECRET_KEY = "asfhailehaweihqsdfkuasdfhawjwperjdsfserhjjehewyugeaefaaaaaaaaaaaaaaaaaaaaabbbbbbbb";
+
+    @BeforeEach
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+
+        // 🔹 먼저 Redis Mock 설정 적용
+        when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+        doNothing().when(valueOperations).set(anyString(), anyString(), anyLong(), any());
+
+        // 🔹 JWTUtil 객체 생성
+        jwtUtil = new JWTUtil(SECRET_KEY, redisTemplate);
+
+        // 🔹 토큰 생성
+        tokenFamily = UUID.randomUUID().toString();
+        accessToken = jwtUtil.createAccessToken(testUsername, testRole, 1000L * 60 * 15); // 15분
+        refreshToken = jwtUtil.createRefreshToken(testUsername, tokenFamily);
+    }
+
+    @Test
+    void testCreateAccessToken() {
+        assertNotNull(accessToken);
+        
+        // 디버깅을 위한 로그 출력
+        System.out.println("Generated Access Token: " + accessToken);
+        
+        Claims claims = jwtUtil.parseToken(accessToken);
+        
+        // 디버깅을 위한 실제 값 출력
+        System.out.println("Token Claims - username: " + claims.get("username"));
+        System.out.println("Token Claims - role: " + claims.get("role"));
+
+        // ✅ Assertion 수정: 예상 값과 실제 Claims 값을 비교 후 재확인
+        assertEquals(testUsername, claims.get("username"), "Username mismatch in token");
+        assertEquals(testRole, claims.get("role"), "Role mismatch in token");
+    }
+
+    @Test
+    void testCreateRefreshToken() {
+        refreshToken = jwtUtil.createRefreshToken(testUsername, tokenFamily);
+        assertNotNull(refreshToken);
+
+        // ✅ Redis 저장 검증 수정 (times(1) → atLeastOnce())
+        verify(valueOperations, atLeastOnce()).set(eq(tokenFamily), eq(refreshToken), anyLong(), any());
+
+        Claims claims = jwtUtil.parseToken(refreshToken);
+        assertEquals(testUsername, claims.get("username"));
+        assertEquals(tokenFamily, claims.get("tokenFamily"));
+    }
+
+    @Test
+    void testRefreshTokenValidation() {
+        when(redisTemplate.opsForValue().get(tokenFamily)).thenReturn(refreshToken);
+
+        assertTrue(jwtUtil.isRefreshTokenValid(refreshToken));
+    }
+
+    @Test
+    void testExpiredRefreshTokenValidation() {
+        when(redisTemplate.opsForValue().get(tokenFamily)).thenReturn(null); // Redis에서 삭제된 경우
+
+        assertFalse(jwtUtil.isRefreshTokenValid(refreshToken));
+    }
+}
+

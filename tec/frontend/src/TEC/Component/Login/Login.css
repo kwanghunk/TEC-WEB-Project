@@ -1,0 +1,10 @@
+/* 전체 컨테이너 스타일 */
+.login-container {
+  background-color: #f8f9fa;
+}
+
+/* 로그인 카드 스타일 */
+.login-card {
+  padding: 20px;
+  border-radius: 10px;
+}

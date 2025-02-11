@@ -1,0 +1,79 @@
+User                  Frontend (React)        Backend (Spring)       Redis (Token Storage)
+ |                         |                         |                         |
+ | -- (1) 로그인 요청 -->  |                         |                         |
+ |                         | -- (2) 로그인 API 호출 --> |                         |
+ |                         |                         | -- (3) 사용자 인증 확인  |
+ |                         |                         |    (비밀번호 확인)       |
+ |                         |                         |                         |
+ |                         |                         | -- (4) AT, RT 생성       |
+ |                         |                         |     (RT는 Redis에 저장) |
+ |                         | <-- (5) 응답(AT, 쿠키 RT) -- |                         |
+ |                         |                         |                         |
+ |                         |                         |                         |
+ | -- (6) API 요청 -->     |                         |                         |
+ |                         | -- (7) AT 포함 요청 --> |                         |
+ |                         |                         | -- (8) AT 검증           |
+ |                         |                         |    (유효하면 API 응답)  |
+ |                         | <-- (9) 응답 받음   ----|                         |
+ |                         |                         |                         |
+ |                         |                         |                         |
+ | -- (10) API 요청 (AT 만료) --> |                 |                         |
+ |                         | -- (11) AT 포함 요청 --> |                         |
+ |                         |                         | -- (12) AT 만료 확인     |
+ |                         |                         |                         |
+ |                         | -- (13) RT로 재발급 요청 -> |                         |
+ |                         |                         | -- (14) RT 검증         |
+ |                         |                         |    (Redis에 저장된 RT 확인) |
+ |                         |                         |    (유효하면 새로운 AT, RT 발급) |
+ |                         |                         | -- (15) Redis에서 기존 RT 삭제 후 갱신 |
+ |                         | <-- (16) 새로운 AT 반환 -- |                         |
+ |                         |                         |                         |
+ | -- (17) API 재요청 -->  |                         |                         |
+ |                         | -- (18) 새로운 AT 포함 요청 -> |                         |
+ |                         |                         | -- (19) AT 검증 및 API 응답 |
+ |                         | <-- (20) 응답 받음 ---- |                         |
+ |                         |                         |                         |
+ |                         |                         |                         |
+ | -- (21) 로그아웃 요청 --> |                         |                         |
+ |                         | -- (22) 로그아웃 API 호출 --> |                         |
+ |                         |                         | -- (23) Redis에서 RT 삭제 |
+ |                         |                         |                         |
+ |                         | <-- (24) 로그아웃 완료 -- |                         |
+
+
+로그인 과정
+
+사용자가 로그인 요청을 보냄.
+프론트엔드에서 로그인 API를 호출.
+백엔드는 사용자 인증 (비밀번호 확인) 후 Access Token(AT)과 Refresh Token(RT)을 생성.
+Access Token은 프론트엔드 메모리에 저장하고, Refresh Token은 HttpOnly Secure 쿠키에 저장.
+Refresh Token은 Redis에 저장하여 관리.
+API 요청
+
+사용자는 Access Token을 Authorization 헤더에 포함하여 API 요청.
+백엔드는 Access Token 검증 후 API 응답 반환.
+Access Token 만료 시 Refresh Token 사용
+
+API 요청 시 Access Token이 만료됨.
+프론트엔드는 Refresh Token을 이용하여 새로운 Access Token 요청.
+백엔드는 Redis에서 Refresh Token을 검증.
+Refresh Token이 유효하면 새로운 Access Token + Refresh Token을 발급.
+Redis에서 기존 Refresh Token을 삭제하고 새로운 Refresh Token으로 갱신.
+프론트엔드는 새로운 Access Token을 사용하여 다시 API 요청.
+Refresh Token 만료 또는 재사용 탐지
+
+만약 Refresh Token이 만료되었거나 이중 사용이 탐지되면, 로그아웃 처리.
+Redis에서 해당 Refresh Token을 삭제하여 더 이상 사용되지 않도록 함.
+사용자는 로그인 페이지로 리다이렉트됨.
+로그아웃 과정
+
+사용자가 로그아웃하면 프론트엔드는 로그아웃 API 호출.
+백엔드는 Redis에서 Refresh Token을 삭제하여 강제 로그아웃 처리.
+프론트엔드는 Access Token을 메모리에서 삭제.
+🚀 결론
+✅ Access Token은 짧게 유지하면서 메모리에서만 관리하여 보안을 강화.
+✅ Refresh Token은 HttpOnly Secure 쿠키를 이용하여 보관하며, Redis에서 관리.
+✅ Refresh Token이 탈취되더라도 Redis 검증을 통해 재사용 방지 (RTR 전략).
+✅ API 요청 시 Access Token이 만료되면 Refresh Token을 이용해 새로운 Access Token 자동 발급.
+✅ Refresh Token이 만료되거나 이상 징후가 감지되면 강제 로그아웃 처리.
+
