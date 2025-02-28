@@ -2,6 +2,7 @@ package com.tecProject.tec.auth;
 
 import java.io.IOException;
 import java.util.Date;
+import java.util.List;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -14,12 +15,17 @@ import com.tecProject.tec.dto.CustomUserDetails;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 public class JWTFilter extends OncePerRequestFilter{
 
 	private final JWTUtil jwtUtil;
+	private static final List<String> PUBLIC_API_ENDPOINTS = List.of(
+			"/user/login", "/user/refresh", "/user/logout",
+			"/api/code", "/api/ip/check", "/api/ip/validate"
+	);
 	
 	public JWTFilter(JWTUtil jwtUtil) {
 		this.jwtUtil = jwtUtil;
@@ -28,64 +34,89 @@ public class JWTFilter extends OncePerRequestFilter{
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
-		//request에서 Authorization 헤더를 찾음
-		String authorization= request.getHeader("Authorization");
-		
-		//Authorization 헤더 검증
-		if (authorization == null || !authorization.startsWith("Bearer ")) {
-			System.out.println("token null");
+		String requestURI = request.getRequestURI();
+		// 비회원 허용 API는 필터 통과
+		if (PUBLIC_API_ENDPOINTS.contains(requestURI)) {
 			filterChain.doFilter(request, response);
-			
-			//조건이 해당되면 메소드 종료 (필수)
 			return;
 		}
 		
-		//Bearer 부분 제거 후 순수 토큰만 획득
-	    String[] parts = authorization.split(" ");
-	    if (parts.length != 2 || parts[1].isEmpty()) {
-	        System.out.println("Invalid token format");
-	        filterChain.doFilter(request, response);
-	        return;
-	    }
+		// request에서 Authorization 헤더를 찾음
+		String authorization= request.getHeader("Authorization");
+		// Authorization 헤더 검증
+		if (authorization == null || !authorization.startsWith("Bearer ")) {
+			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+			response.getWriter().write("Unauthorized - No Access Token");
+			return; // 조건이 해당되면 메소드 종료 (필수)
+		}
+		
+		// Bearer 부분 제거 후 순수 토큰만 획득
+		String token = authorization.replace("Bearer ", "");
+		
+	    if (jwtUtil.parseTokenExpirationCheck(token)) {
+	    	System.out.println("Access Token 만료됨, Refresh Token 확인 시작...");
+	    	
+            String refreshToken = jwtUtil.getRefreshTokenFromCookie(request); // Refresh Token 가져오기
+            if (refreshToken == null || !jwtUtil.isRefreshTokenValid(refreshToken)) {
+                System.out.println("Refresh Token이 유효하지 않음, 401 반환");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Unauthorized - Invalid Refresh Token");
+                return;
+            }
+                
+                // 새 Token 발급
+            Claims refreshClaims = jwtUtil.parseToken(refreshToken);
+            String username = refreshClaims.get("username", String.class);
+            String userType = refreshClaims.get("userType", String.class);
+            String tokenFamily = refreshClaims.get("tokenFamily", String.class);
 
-	    String token = parts[1];
-
-	    try {
-            Claims claims = jwtUtil.parseToken(token); // JWT 파싱하여 Claims 추출
+            jwtUtil.revokeRefreshToken(refreshToken); // 기존 Refresh Token 폐기
             
-	    	// 토큰 소멸 시간 검증
-            Date expiration = claims.getExpiration();
-	        if (expiration.before(new Date())) { // 현재 시간과 비교하여 만료 여부 체크
-	            System.out.println("Token expired");
-	            filterChain.doFilter(request, response);
-	            // 조건이 해당되면 메소드 종료 (필수)
-	            return;
-	        }
+            String newAccessToken = jwtUtil.createAccessToken(username, userType, 1000L * 60 * 15);
+            String newRefreshToken = jwtUtil.createRefreshToken(username, userType, tokenFamily);
+	            
+            // 새로운 Refresh Token을 쿠키에 저장
+            Cookie newRefreshCookie = new Cookie("refreshToken", newRefreshToken);
+            newRefreshCookie.setHttpOnly(true);
+            newRefreshCookie.setSecure(true);
+            newRefreshCookie.setAttribute("SameSite", "Strict");
+            newRefreshCookie.setPath("/");
+            response.addCookie(newRefreshCookie);
+            
+            response.setHeader("Authorization", "Bearer " + newAccessToken); // 새 Access Token을 응답 헤더에 추가
+            System.out.println("새로운 Access Token 발급 완료!");
+            
+            token = newAccessToken.replace("Bearer ", "");
+        }
+		System.out.println("claims 전");
+			// 토큰에서 username과 userType 획득
+	    Claims claims = jwtUtil.parseToken(token);
+	    System.out.println("claims 후");
+        String username = claims.get("username", String.class); // 사용자 이름 가져오기
+        String userType = claims.get("userType", String.class); // 사용자 역할 가져오기
+		System.out.println("username, userType: " + username + ", " + userType);
 		
-			//토큰에서 username과 role 획득
-            String username = claims.get("username", String.class); // 사용자 이름 가져오기
-            String role = claims.get("userType", String.class); // 사용자 역할 가져오기
+		// user를 생성하여 값 set
+		User user = new User();
+		user.setUsername(username);
+		user.setPassword("temppassword");// 매번 db 조회할 필요 없게 임의값 넣어둠
+		user.setUserType(userType);
 			
-			//user를 생성하여 값 set
-			User user = new User();
-			user.setUsername(username);
-			user.setPassword("temppassword");// 매번 db 조회할 필요 없게 임의값 넣어둠
-			user.setUserType(role);
-			
-			//UserDetails에 회원 정보 객체 담기
-			CustomUserDetails customUserDetails = new CustomUserDetails(user);
-			
-			//스프링 시큐리티 인증 토큰 생성
-			Authentication authToken = new UsernamePasswordAuthenticationToken(customUserDetails, null, customUserDetails.getAuthorities());
-			//세션에 사용자 등록
-			SecurityContextHolder.getContext().setAuthentication(authToken);
-	    } catch (Exception e) {
-	    	System.out.println("jwt parsing failed: " + e.getMessage());
-	    }
+		//UserDetails에 회원 정보 객체 담기
+		CustomUserDetails customUserDetails = new CustomUserDetails(user);
+		
+		//스프링 시큐리티 인증 토큰 생성
+		Authentication authToken = new UsernamePasswordAuthenticationToken(
+				customUserDetails, null, customUserDetails.getAuthorities());
+		//세션에 사용자 등록
+		SecurityContextHolder.getContext().setAuthentication(authToken);
+		System.out.println("필터 완료 전");
+		
  		filterChain.doFilter(request, response);
-		
-		
+ 		System.out.println("필터 완료");
 	}
+	
+
 
 	
 	

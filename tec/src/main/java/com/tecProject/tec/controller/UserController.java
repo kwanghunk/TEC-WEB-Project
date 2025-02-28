@@ -1,15 +1,16 @@
 package com.tecProject.tec.controller;
 
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -21,9 +22,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.tecProject.tec.auth.JWTUtil;
 import com.tecProject.tec.domain.User;
+import com.tecProject.tec.dto.ChangePasswordDTO;
+import com.tecProject.tec.dto.UserDTO;
 import com.tecProject.tec.service.UserService;
 
-import io.jsonwebtoken.Claims;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+
 
 @RestController
 @RequestMapping("/user")
@@ -37,68 +43,67 @@ public class UserController {
     	this.userService = userService;
     }
     
-
-    // 기존 메서드
-    @GetMapping
-    public String mainP() {
-        // 세션에서 아이디 확인
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-
-        // 세션에서 userType 확인
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
-        Collection<? extends GrantedAuthority> authorities = authentication.getAuthorities();
-        Iterator<? extends GrantedAuthority> iter = authorities.iterator();
-        GrantedAuthority auth = iter.next();
-        String role = auth.getAuthority();
-
-        return "Main Controller: " + username + " " + role;
-    }
-
-    // 새로운 프로필 API
-    @GetMapping("/profile/{username}")
-    public ResponseEntity<?> getUserProfile(@PathVariable("username") String username) {
-        try {
-            User user = userService.findUserByUsername(username);
-            if (user != null) {
-                return ResponseEntity.ok(user);
-            } else {
-                return ResponseEntity.status(404).body("User not found");
-            }
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("An error occurred: " + e.getMessage());
+    @GetMapping("/profile")
+    public ResponseEntity<?> getUserInfo() {   
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
         }
+        String username = authentication.getName(); // JWT에서 username 추출
+		try {
+			UserDTO userInfo = userService.getUserInfo(username);
+			return ResponseEntity.ok(userInfo);
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("회원정보 조회 실패: " + e.getMessage());
+		}
     }
     
     @PutMapping("/profile/update")
-    public ResponseEntity<?> updateUserProfile(@RequestBody User user) {
+    public ResponseEntity<?> updateUserProfile(@RequestBody UserDTO userDTO) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+        }
+        String username = authentication.getName(); // JWT에서 username 추출
         try {
-            User updatedUser = userService.updateUser(user);
-            return ResponseEntity.ok(updatedUser);
+            userService.updateUserProfile(username, userDTO);
+            return ResponseEntity.ok("회원정보가 성공적으로 변경되었습니다.");
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(400).body(e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Update failed: " + e.getMessage());
+            return ResponseEntity.status(500).body("회원정보 수정 실패: " + e.getMessage());
         }
     }
     
-    @PutMapping("/changePassword/{username}")
-    public ResponseEntity<?> changePassword(@PathVariable("username") String username, @RequestBody Map<String, String> passwords) {
+    @PutMapping("/profile/changePassword")
+    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordDTO changePasswordDTO) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+        }
+        String username = authentication.getName(); // JWT에서 username 추출
         try {
-            String currentPassword = passwords.get("currentPassword");
-            String newPassword = passwords.get("newPassword");
-
-            boolean isPasswordChanged = userService.changePassword(username, currentPassword, newPassword);
+            boolean isPasswordChanged = userService.changePassword(username, changePasswordDTO.getCurrentPassword(), changePasswordDTO.getNewPassword());
 
             if (isPasswordChanged) {
-                return ResponseEntity.ok("Password changed successfully.");
+                return ResponseEntity.ok("비밀번호가 성공적으로 변경되었습니다.");
             } else {
-                return ResponseEntity.status(400).body("Current password is incorrect.");
+                return ResponseEntity.status(400).body("현재 비밀번호가 올바르지 않습니다.");
             }
         } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error changing password: " + e.getMessage());
+            return ResponseEntity.status(500).body("비밀번호 변경 실패: " + e.getMessage());
         }
     }
     
-    
-    
+    @DeleteMapping("/delete")
+    public ResponseEntity<?> deleteUser(HttpServletRequest request, HttpServletResponse response) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+        }
+        String username = authentication.getName();
+        return userService.deleteUser(username, request, response);
+    }
     
 }

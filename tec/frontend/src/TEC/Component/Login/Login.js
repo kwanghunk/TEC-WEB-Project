@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import "bootstrap/dist/css/bootstrap.min.css";
 import { Button, Card, Col, Container, Form, Row, Spinner } from "react-bootstrap";
 import "./Login.css";
-import axiosInstance from "../../utils/FuncAxios";
+import axiosInstance, { setAccessToken } from "../../utils/FuncAxios";
+import { fetchUserIpStatus } from "../../utils/Ip";
 
 const Login = ({ setUser }) => {
   const navigate = useNavigate();
@@ -11,8 +12,6 @@ const Login = ({ setUser }) => {
   const [message, setMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [hisotorys, setHistorys] = useState([]);
-
-  let accessToken = null; // Access Token을 메모리에 유지
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,11 +31,19 @@ const Login = ({ setUser }) => {
       setIsLoading(true);
       const response = await axiosInstance.post("/user/login", formData, { withCredentials: true });
       
-      accessToken = response.data.accessToken; // Access Token 메모리에 저장
-      console.log("Login submit /user/login res: ", response); // 디버깅 로그
-      console.log("로그인 성공: Access Token 발급됨");
+      console.log("[Login.js] 로그인 성공 - Access Token 수신:", response.data.accessToken);
+
+      // Access Token을 FuncAxios.js에 설정
+      setAccessToken(response.data.accessToken);
     
-      setUser(response.data.username); // 사용자 정보 저장
+      // 로그인 정보 저장
+      const userData = { username: response.data.username, userType: response.data.userType};
+      setUser(userData); // 사용자 정보 저장
+      sessionStorage.setItem("user", JSON.stringify(userData));
+      sessionStorage.setItem("accessToken", response.data.accessToken);
+
+      // 로그인 성공 후 IP 및 회원 정보 최신화
+      await fetchUserIpStatus();
 
       sessionStorage.removeItem("translationHistory");
       setHistorys([]);

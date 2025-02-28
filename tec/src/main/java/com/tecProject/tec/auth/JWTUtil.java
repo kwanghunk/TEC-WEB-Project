@@ -13,7 +13,10 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 
 @Component
 public class JWTUtil {
@@ -38,9 +41,10 @@ public class JWTUtil {
 	}
 	
 	// RefreshToken 생성
-	public String createRefreshToken(String username, String tokenFamily) {
+	public String createRefreshToken(String username, String userType, String tokenFamily) {
 		String refreshToken = Jwts.builder()
 				.claim("username", username)
+				.claim("userType", userType)
 				.claim("tokenFamily", tokenFamily)
 				.issuedAt(new Date())
 				.expiration(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24)) // 24시간
@@ -90,11 +94,37 @@ public class JWTUtil {
 	
 	// token 검증 후 Claims(토큰 데이터) 추출
     public Claims parseToken(String token) {
-        return Jwts.parser()
+        Claims claims = Jwts.parser()
                 .verifyWith(secretKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
+        return claims;
+    }
+    
+    // 만료된 토큰에서도 Claims를 가져오는 메소드
+    public boolean parseTokenExpirationCheck(String token) {
+        try {
+	    	Jwts.parser()
+	                .verifyWith(secretKey)
+	                .build()
+	                .parseSignedClaims(token)
+	                .getPayload();
+	    	return false;
+        } catch (ExpiredJwtException e) {
+        	return true;
+        }
     }
 	
+    // Refresh Token 쿠키 가져오기
+    public String getRefreshTokenFromCookie(HttpServletRequest request) {
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if (cookie.getName().equals("refreshToken")) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
+    }
 }

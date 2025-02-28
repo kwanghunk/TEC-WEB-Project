@@ -1,0 +1,90 @@
+package com.tecProject.tec.service;
+
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.tecProject.tec.domain.UserSupport;
+import com.tecProject.tec.domain.UserSupport.InquiryCategory;
+import com.tecProject.tec.domain.UserSupport.InquiryStatus;
+import com.tecProject.tec.dto.support.AdminSupportDetailDTO;
+import com.tecProject.tec.repository.SupportRepository;
+
+@Service
+public class AdminSupportService {
+	private final SupportRepository supportRepository;
+	
+	public AdminSupportService(SupportRepository supportRepository) {
+		this.supportRepository = supportRepository;
+	}
+	
+    // 문의내역 전체조회(관리자)
+	public Page<UserSupport> getFilteredInquiries(Pageable pageable, InquiryStatus status, InquiryCategory category, String keyword) {
+	    if (status != null && category != null && keyword != null) { // 문의상태 + 카테고리 + 키워드 조회
+	        return supportRepository.findByStatusAndCategoryAndTitleContainingAndIsDeletedAndParentInquiryIsNull(status, category, keyword, "N", pageable);
+	    } else if (status != null && category != null) { // 문의상태 + 카테고리
+	    	return supportRepository.findByStatusAndCategoryAndIsDeletedAndParentInquiryIsNull(status, category, "N", pageable);
+	    } else if (status != null && keyword != null) { // 문의상태 + 키워드
+	    	return supportRepository.findByStatusAndTitleContainingAndIsDeletedAndParentInquiryIsNull(status, keyword, "N", pageable);
+	    } else if (category != null && keyword != null) { // 카테고리 + 키워드
+	    	return supportRepository.findByCategoryAndTitleContainingAndIsDeletedAndParentInquiryIsNull(category, keyword, "N", pageable);
+	    } else if (status != null) { // 문의상태 조회
+	        return supportRepository.findByStatusAndIsDeletedAndParentInquiryIsNull(status, "N", pageable);
+	    } else if (category != null) { // 카테고리 조회
+	        return supportRepository.findByCategoryAndIsDeletedAndParentInquiryIsNull(category, "N", pageable);
+	    } else if (keyword != null) { // 키워드 조회
+	        return supportRepository.findByTitleContainingAndIsDeletedAndParentInquiryIsNull(keyword, "N", pageable);
+	    } // 기본 전체 조회
+	    return supportRepository.findByIsDeletedAndParentInquiryIsNull("N", pageable); 
+	}
+
+	// 문의내역 상세조회(관리자)
+	@Transactional
+	public Optional<AdminSupportDetailDTO> getInquiryById(int inquiryNo) { 
+        Optional<UserSupport> inquiry = supportRepository.findById(inquiryNo);
+        if (inquiry.isEmpty() || "Y".equals(inquiry.get().getIsDeleted())) {
+            return Optional.empty();
+        } 
+        
+        UserSupport inquiryEntity = inquiry.get(); // 🔹 Optional → 실제 객체 변환
+
+        // ✅ 모든 답변 조회 (최상위 답변 + 하위 답변 포함)
+        List<UserSupport> allReplies = supportRepository.findByInquiryNoOrParentInquiry(inquiryNo);
+
+        // ✅ 답변을 맵에 저장 (inquiryNo → DTO 변환 후 저장)
+        Map<Integer, AdminSupportDetailDTO> replyMap = new HashMap<>();
+        for (UserSupport reply : allReplies) {
+            AdminSupportDetailDTO replyDTO = AdminSupportDetailDTO.fromEntity(reply);
+            replyDTO.setReplies(new ArrayList<>());
+            replyMap.put(reply.getInquiryNo(), replyDTO);
+        }
+
+        // ✅ 부모-자식 관계 매핑
+        List<AdminSupportDetailDTO> structuredReplies = new ArrayList<>();
+        for (AdminSupportDetailDTO replyDTO : replyMap.values()) {
+            if (replyDTO.getParentInquiry() != null && replyDTO.getParentInquiry().equals(inquiryNo)) {
+                structuredReplies.add(replyDTO); // 최상위 부모 답변
+            } else {
+                AdminSupportDetailDTO parentReply = replyMap.get(replyDTO.getParentInquiry());
+                if (parentReply != null) {
+                    parentReply.getReplies().add(replyDTO);
+                }
+            }
+        }
+
+        // ✅ DTO 변환 (최상위 부모 답변 포함)
+        AdminSupportDetailDTO inquiryDTO = AdminSupportDetailDTO.fromEntity(inquiryEntity);
+        inquiryDTO.setReplies(structuredReplies);
+
+        System.out.println("✅ 백엔드 응답 데이터: " + inquiryDTO);
+        return Optional.of(inquiryDTO);
+    }
+}

@@ -1,0 +1,16 @@
+/* 페이지네이션 기본 스타일 */
+.custom-pagination .page-item .page-link {
+  background-color: #6841ea;
+  color: white;
+  border: 1px solid #6841ea;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* 페이지네이션 호버 시 스타일 */
+.custom-pagination .page-item .page-link:hover {
+  background-color: #FFC107;
+  color: #6841ea;
+  border: 1px solid #FFC107;
+  font-weight: bold;
+}
+

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import axios from "axios";
 import "../Styles/CodeManagement.css";
 import { useNavigate } from "react-router-dom";
+import axiosInstance from "../utils/FuncAxios";
 
 function CodeManagement() {
   const [keyword, setKeyword] = useState(""); // 입력 또는 수정할 키워드
@@ -23,26 +24,12 @@ function CodeManagement() {
   });
   const navigate = useNavigate();
 
-  // 유틸리티 함수: 토큰 검증
-  const checkToken = () => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-        alert("로그인이 필요합니다.");
-        navigate("/User/Login");
-        return;
-    }
-    return token;
-  }
 
   useEffect(() => {
-    const token = checkToken();
-    if (!token) return;
 
     const verifyAdminAccess = async () => {
       try {
-        const response = await axios.get("/admin/code/auth", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const response = await axiosInstance.get("/admin/code/auth", { withCredentials: true });
         if (!response.data) {
           alert("입장 권한이 없습니다.");
           navigate("/");
@@ -72,17 +59,14 @@ function CodeManagement() {
 
   // 검색창 입력
   const handleSearchChange = async (e) => {
-    const token = checkToken();
-    if (!token) return;
-    console.log("handleSearchChange token: ", token);
     const value = e.target.value;
     setSearchQuery(value);
     if(value.trim()) {
       try {
-        const response = await axios.get("/admin/code/suggestions", {
-          params: { query: value },
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const response = await axiosInstance.get("/admin/code/suggestions", 
+          {params: { query: value }},
+          {withCredentials: true}
+      );
         console.log("handleSearchChange response: ", response.data);
         if (response.data.length > 0) {
           setSuggestions(response.data); // 검색된 결과를 제안 목록으로 설정
@@ -105,18 +89,16 @@ function CodeManagement() {
 
   // 확인 버튼 클릭 처리
   const handleConfirm = async () => {
-    const token = checkToken();
-    if (!token) return;
     if(!searchQuery.trim()) {
       alert("키워드를 입력하세요");
       return;
     }
     try {
       // DB 번역 데이터 가져오기
-      const response = await axios.get("/admin/code/details", {
-        params: { keyword: searchQuery },
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const response = await axiosInstance.get("/admin/code/details", 
+        { params: { keyword: searchQuery } },
+        { withCredentials: true }
+      );
       const translationsData = response.data?.translateCode
         ? JSON.parse(response.data.translateCode)
         : {};
@@ -143,8 +125,6 @@ function CodeManagement() {
   
   // 저장
   const handleSave = async () => {
-    const token = checkToken();
-    if (!token) return;
     if (!keyword.trim()) {
       alert("수정 키워드를 입력하세요.");
       return;
@@ -158,9 +138,7 @@ function CodeManagement() {
         translateCode: JSON.stringify(translations)
       };
       console.log("payload: ", payload);
-      await axios.post("/admin/code/addKeyword", payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axiosInstance.post("/admin/code/addKeyword", payload, { withCredentials: true });
       alert("저장되었습니다.");
       setKeyword(""); // 저장 후 수정 키워드 상태 초기화
       setTranslations({ // 저장 후 번역결과 값 초기화화

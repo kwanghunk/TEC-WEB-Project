@@ -5,10 +5,13 @@ import java.util.Map;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -57,23 +60,25 @@ public class SaveHistoryController {
 	
 	// 히스토리 조회(사용자)
 	@GetMapping("/load")
-	public ResponseEntity<?> loadSavedHistory(@RequestParam("page") int page, @RequestParam("size") int size) {
+	public ResponseEntity<?> loadSavedHistory(
+			@RequestParam(name = "page", defaultValue = "0") int page, 
+			@RequestParam(name = "size", defaultValue = "10") int size, 
+			@RequestParam(name = "searchType", required = false) String searchType, 
+			@RequestParam(name = "keyword", required = false) String searchQuery ) {
 		//인증 정보 가져오기    
 		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
         }
         String username = authentication.getName(); // JWT에서 username 추출
-        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "saveTime"));
-        Page<SaveHistory> savedHistories = saveHistoryService.getSavedHistories(username, pageRequest);
-        
-        Page<SaveHistoryDTO> result = savedHistories.map(history -> new SaveHistoryDTO(
-        		history.getSaveHistoryNo(),
-        		history.getUsername(),
-        		history.getHistoryTitle(),
-        		history.getSaveTime()
-        		));
-        return ResponseEntity.ok(result);
+        try {
+        	Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "saveTime"));
+            Page<SaveHistoryDTO> result = saveHistoryService.getSavedHistories(username, pageable, searchType, searchQuery);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+					.body("히스토리 조회 실패: " + e.getMessage());
+		}
 	}
 	
 	// 히스토리 상세조회(사용자)
@@ -96,42 +101,47 @@ public class SaveHistoryController {
 	}
 	
 	// 히스토리 삭제(사용자)
-	@DeleteMapping("/detail/{saveHistoryNo}")
+	@DeleteMapping("/delete/{saveHistoryNo}")
 	public ResponseEntity<?> deleteHistory(@PathVariable("saveHistoryNo") int saveHistoryNo) {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
         }
-
         String username = authentication.getName(); // JWT에서 username 추출
-        boolean isDeleted = saveHistoryService.deleteHistory(saveHistoryNo, username);
-        
-        if (isDeleted) {
-        	return ResponseEntity.ok("히스토리가 성공적으로 삭제되었습니다.");
-        } else {
+        try {
+        	boolean isDeleted = saveHistoryService.deleteHistory(saveHistoryNo, username);
+            if (isDeleted) {
+            	return ResponseEntity.ok("히스토리가 성공적으로 삭제되었습니다.");
+            } else {
+            	return ResponseEntity.status(HttpStatus.FORBIDDEN).body("히스토리 삭제 권한이 없습니다.");
+            }
+        } catch (IllegalArgumentException e) {
         	return ResponseEntity.status(HttpStatus.FORBIDDEN).body("히스토리 삭제 권한이 없습니다.");
+        } catch (Exception e) {
+        	return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("알 수 없는 오류가 발생했습니다.");
         }
 	}
 
 	// DB 히스토리 다운로드(사용자)
-	@GetMapping("/detail/{saveHistoryNo}/download")
+	@PostMapping("/download/{saveHistoryNo}")
 	public ResponseEntity<?> downloadTranslation(
 			@PathVariable(value= "saveHistoryNo") int saveHistoryNo, 
-			@RequestParam(value= "fileName") String fileName) throws IOException {
+			@RequestParam(value= "fileName", defaultValue = "DECOBET") String fileName) throws IOException {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || !authentication.isAuthenticated()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
         }
-        
+        String username = authentication.getName();
         try {
-	        String username = authentication.getName(); // JWT에서 username 추출
 			// DB 데이터 조회 + 파일 내용 생성
 			String fileContent = saveHistoryService.generateFileContentFromDB(saveHistoryNo, username);
+			// UTF-8 인코딩된 파일명 설정
 			String encodedFileName = UriUtils.encode(fileName, StandardCharsets.UTF_8);
+			
 			return ResponseEntity.ok()
-					.header("Content-Disposition", "attachment; filename*=UTF-8''" + encodedFileName + ".txt")
-					.contentType(MediaType.TEXT_PLAIN)
-					.body(fileContent);
+					.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFileName)
+					.contentType(MediaType.APPLICATION_OCTET_STREAM)
+					.body(fileContent.getBytes(StandardCharsets.UTF_8)); // 바이트 배열 반환
         } catch (IllegalArgumentException e) {
         	return ResponseEntity.status(HttpStatus.FORBIDDEN).body("다운로드 권한이 없습니다.");
         } catch (Exception e) {
@@ -152,6 +162,8 @@ public class SaveHistoryController {
 					.header("Content-Disposition", "attachment; filename*=UTF-8''" + encodedFileName + ".txt")
 					.contentType(MediaType.TEXT_PLAIN)
 					.body(fileContent);
+		} catch (BadCredentialsException e) {
+			return ResponseEntity.status(401).body("로그인이 필요한 기능입니다.");
 		}catch (Exception e) {
 			e.printStackTrace();
         	return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("파일 생성 중 오류가 발생했습니다.");

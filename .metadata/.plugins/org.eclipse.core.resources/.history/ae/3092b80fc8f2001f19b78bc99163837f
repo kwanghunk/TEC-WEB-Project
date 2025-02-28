@@ -1,0 +1,263 @@
+package com.tecProject.tec.controller;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.tecProject.tec.domain.UserSupport;
+import com.tecProject.tec.dto.UserSupportDTO;
+import com.tecProject.tec.dto.support.SupportReplyUpdateDTO;
+import com.tecProject.tec.dto.support.SupportReplyWriteDTO;
+import com.tecProject.tec.dto.support.UserSupportDetailDTO;
+import com.tecProject.tec.dto.support.UserSupportSearchDTO;
+import com.tecProject.tec.dto.support.UserSupportUpdateDTO;
+import com.tecProject.tec.dto.support.UserSupportWriteDTO;
+import com.tecProject.tec.service.SupportService;
+
+@RestController
+@RequestMapping("/api/user-support")
+public class SupportController {
+
+	private final SupportService supportService;
+	
+    // 서비스 사용 준비
+    public SupportController(SupportService supportService) {
+        this.supportService = supportService;
+    }
+    
+    // 문의 등록(사용자)
+    @PostMapping
+    public ResponseEntity<?> createInquiry(@RequestBody UserSupportWriteDTO userSupportWriteDTO) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+        }
+        
+        // 필수 값 검증
+        if (userSupportWriteDTO.getTitle() == null || userSupportWriteDTO.getTitle().trim().isEmpty()) {
+        	return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("문의 제목을 입력하세요.");
+        }
+        if (userSupportWriteDTO.getContent() == null || userSupportWriteDTO.getContent().trim().isEmpty()) {
+        	return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("문의 내용을 입력하세요.");
+        }
+        if (userSupportWriteDTO.getCategory() == null) {
+        	return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("카테고리를 선택해주세요.");
+        }
+        String username = authentication.getName(); // JWT에서 username 추출
+        UserSupportWriteDTO createdInquiry = supportService.createInquiry(userSupportWriteDTO, username);
+
+        return ResponseEntity.ok(createdInquiry);
+    }
+    
+    // 문의 수정(사용자)
+    @PutMapping("/{inquiryNo}")
+    public ResponseEntity<?> updateInquiry(@PathVariable("inquiryNo") int inquiryNo,
+                                            @RequestBody UserSupportDTO updatedInquiry) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+        }
+        String username = authentication.getName(); // JWT에서 username 추출
+        // 서비스 호출
+        Optional<UserSupport> inquiry = supportService.updateInquiry(
+                inquiryNo,
+                username,
+                updatedInquiry.getTitle(),
+                updatedInquiry.getContent(),
+                updatedInquiry.getCategory()
+        );
+        if (inquiry.isPresent()) {
+            return ResponseEntity.ok(UserSupportUpdateDTO.fromEntity(inquiry.get()));
+        } else {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("문의 수정 권한이 없습니다.");
+        }
+    }
+    
+    // 문의 삭제(사용자)
+    @DeleteMapping("/{inquiryNo}")
+    public ResponseEntity<?> deleteInquiry(@PathVariable("inquiryNo") int inquiryNo) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+        }
+
+        String username = authentication.getName(); // JWT에서 username 추출
+        Optional<UserSupport> deletedInquiry = supportService.deleteInquiry(inquiryNo, username);
+
+        if (deletedInquiry.isPresent()) {
+            return ResponseEntity.ok("문의가 성공적으로 삭제되었습니다.");
+        } else {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("문의 삭제 권한이 없습니다.");
+        }
+    }
+    
+    // 문의내역 전체조회(사용자)
+    @GetMapping
+    public ResponseEntity<?> getInquiryByUsername() {
+    	Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+    	if (authentication == null || !authentication.isAuthenticated()) {
+    		return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+    	}
+    	
+    	String username = authentication.getName(); // JWT에서 username 추출
+    	List<UserSupportSearchDTO> inquiries = supportService.getInquiryByUsername(username);
+    	
+    	if (inquiries.isEmpty()) {
+    		return ResponseEntity.ok("문의 내역이 없습니다.");
+    	}
+    	return ResponseEntity.ok(inquiries);
+    }
+    
+	// 문의내역 키워드 조회(사용자)
+    @GetMapping("/search")
+    public ResponseEntity<?> getInquiriesByKeyword(@RequestParam(value = "keyword", required = false) String keyword) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+        }
+
+        String username = authentication.getName(); // JWT에서 username 추출
+        List<UserSupportSearchDTO> inquiries = supportService.getInquiriesByKeyword(username, keyword);
+        if (inquiries.isEmpty()) {
+            return ResponseEntity.ok("검색된 문의 내역이 없습니다.");
+        }
+        return ResponseEntity.ok(inquiries);
+    }
+    
+    // 문의내역 상세조회(사용자)
+    @GetMapping("/{inquiryNo}")
+    public ResponseEntity<?> getInquiryById(@PathVariable("inquiryNo") int inquiryNo) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+        }
+
+        String username = authentication.getName(); // JWT에서 username 추출
+        Optional<UserSupportDetailDTO> inquiry = supportService.getInquiryById(inquiryNo, username);
+
+        if (inquiry.isPresent()) {
+            return ResponseEntity.ok(inquiry.get());
+        } else {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("문의 상세 정보를 조회할 수 없습니다.");
+        }
+    }
+    
+	
+	// 문의내역 답글 작성(작성자 || 관리자)
+	@PostMapping("/{inquiryNo}/reply")
+	public ResponseEntity<?> addReply(
+			@PathVariable("inquiryNo") int inquiryNo,
+			@RequestBody Map<String, Object> requestBody) {
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		if (authentication == null || !authentication.isAuthenticated()) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+		}
+		
+		String username = authentication.getName(); // 로그인 유저 아이디 
+		boolean isAdmin = authentication.getAuthorities().stream() // 관리자 권한
+		        .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+		
+		String replyContent = (String) requestBody.get("reply"); // 추가할 데이터 덩어리
+		Object parentInquiryObj = requestBody.get("parentInquiry");
+		
+	    // inquiryNo와 parentInquiry 로그 추가 (디버깅 용도)
+	    System.out.println("📌 inquiryNo: " + inquiryNo);
+	    System.out.println("📌 parentInquiry: " + parentInquiryObj);
+		
+	    // parentInquiry 값이 null이 아닌 경우 Integer 변환
+	    Integer parentInquiryId = null;
+	    if (parentInquiryObj instanceof Number) {
+	        parentInquiryId = ((Number) parentInquiryObj).intValue();  // 숫자 타입 처리
+	    } else if (parentInquiryObj instanceof String) {
+	        try {
+	            parentInquiryId = Integer.parseInt((String) parentInquiryObj);  // String → Integer 변환
+	        } catch (NumberFormatException e) {
+	            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("parentInquiry 값이 올바르지 않습니다.");
+	        }
+	    }
+
+	    if (replyContent == null || replyContent.trim().isEmpty()) {
+	        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("답변 내용을 입력하세요.");
+	    }
+
+	    Optional<SupportReplyWriteDTO> updatedInquiry = supportService.addReply(inquiryNo, username, isAdmin, replyContent, parentInquiryId);
+	    
+	    if (updatedInquiry.isPresent()) {
+	        return ResponseEntity.ok(updatedInquiry.get());
+	    } else {
+	        return ResponseEntity.status(HttpStatus.FORBIDDEN).body("답변을 작성할 권한이 없습니다.");
+	    }
+	}
+	
+	// 문의내역 답글 수정(작성자 || 관리자)
+	@PutMapping("/{replyNo}/edit")
+	public ResponseEntity<?> editReply(
+			@PathVariable("replyNo") int replyNo,
+			@RequestBody Map<String, String> requestBody) {
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		if (authentication == null || !authentication.isAuthenticated()) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+		}
+	    String username = authentication.getName();
+	    
+	    String newContent = requestBody.get("reply");
+	    if (newContent == null || newContent.trim().isEmpty()) {
+	        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("답변 내용을 입력하세요.");
+	    }
+	    
+	    Optional<SupportReplyUpdateDTO> updatedReply = supportService.editReply(replyNo, username, newContent);
+	    if (updatedReply.isPresent()) {
+	        return ResponseEntity.ok(updatedReply.get());
+	    } else {
+	        return ResponseEntity.status(HttpStatus.FORBIDDEN).body("답변을 수정할 권한이 없습니다.");
+	    }
+	}
+	
+	// 문의내역 답글 삭제(작성자 || 관리자)
+	@DeleteMapping("/{replyNo}/delete")
+	public ResponseEntity<?> deleteReply(@PathVariable("replyNo") int replyNo) {
+	    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+	    if (authentication == null || !authentication.isAuthenticated()) {
+	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+	    }
+
+	    String username = authentication.getName();
+	    boolean deleted = supportService.deleteReply(replyNo, username);
+	    if (deleted) {
+	        return ResponseEntity.ok("답변이 삭제되었습니다.");
+	    } else {
+	        return ResponseEntity.status(HttpStatus.FORBIDDEN).body("삭제 권한이 없습니다.");
+	    }
+	}
+	
+	// 문의내역 상태 업데이트
+	@PutMapping("/{inquiryNo}/complete")
+	public ResponseEntity<?> completeInquiry(@PathVariable("inquiryNo") int inquiryNo) {
+	    Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+	    if (authentication == null || !authentication.isAuthenticated()) {
+	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("로그인 후 이용 가능합니다.");
+	    }
+	    String username = authentication.getName();
+	    boolean isAdmin = authentication.getAuthorities().stream()
+	            .anyMatch(authority -> authority.getAuthority().equals("ROLE_ADMIN"));
+		
+	    boolean updated = supportService.completeInquiry(inquiryNo, username, isAdmin);
+	    return updated ? ResponseEntity.ok("문의가 완료 처리되었습니다.") 
+	    			   : ResponseEntity.status(HttpStatus.FORBIDDEN).body("처리 권한이 없습니다.");
+	}
+    
+}

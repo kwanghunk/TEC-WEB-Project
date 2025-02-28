@@ -34,7 +34,7 @@ O. 악성 공격 시나리오
 
 2. Refresh Token 탈취 공격 (Session Fixation, Cookie Theft)
 	2-1. 공격 방법
-		1) 용자의 refreshToken을 탈취 후 지속적으로 새로운 accessToken 생성(로그아웃 전까지)
+		1) 사용자의 refreshToken을 탈취 후 지속적으로 새로운 accessToken 생성(로그아웃 전까지)
 	2-2. 방어 방법
 		1) Refresh Token을 HttpOnly Secure 쿠키에 저장
 		- HttpOnly: JavaScript로 접근 불가능 → XSS 공격으로 탈취 불가.

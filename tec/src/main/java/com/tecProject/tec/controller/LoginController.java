@@ -21,6 +21,9 @@ import com.tecProject.tec.dto.LoginDTO;
 import com.tecProject.tec.service.LoginService;
 
 import io.jsonwebtoken.Claims;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/user")
@@ -48,7 +51,7 @@ public class LoginController {
 			// Access Token 및 Refresh Token 생성
 			String tokenFamily = UUID.randomUUID().toString(); // Refresh Token 관리용 고유 ID
 			String accessToken = jwtUtil.createAccessToken(user.getUsername(), user.getUserType(), 1000L * 60 * 15); // 15분
-			String refreshToken = jwtUtil.createRefreshToken(user.getUsername(), tokenFamily);
+			String refreshToken = jwtUtil.createRefreshToken(user.getUsername(), user.getUserType(), tokenFamily);
 			
 			// Refresh Token을 쿠키에 저장
 			ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
@@ -70,11 +73,16 @@ public class LoginController {
 		}
 	}
 	
-	// 로그인 직후 사용자 검증 API
+	// 로그인 후 && 새로고침 시 사용자 검증 API
     @GetMapping("/me")
     public ResponseEntity<?> getCurrentUser(@RequestHeader(name = "Authorization", required = false) String token) {
+        // 1️⃣ Access Token이 없는 경우 → 비회원 응답 반환
         if (token == null || !token.startsWith("Bearer ")) {
-            return ResponseEntity.status(401).body("Access Token이 필요합니다.");
+        	System.out.println("token: " + token);
+            Map<String, String> response = new HashMap<>();
+            response.put("username", "Guest");
+            response.put("userType", "GUEST");
+            return ResponseEntity.ok(response);
         }
     	try {
             Claims claims = jwtUtil.parseToken(token.replace("Bearer ", "")); // JWT 토큰 검증
@@ -92,56 +100,26 @@ public class LoginController {
         }
     }
 	
-    // AT만료 시 새로운 Token 발급 API
-	@PostMapping("/refresh")
-	public ResponseEntity<?> refreshAccessToken(
-			// @RequestHeader("Refresh-Token") String refreshToken) {
-	        @CookieValue(value = "refreshToken", required = false) String refreshToken) {
-
-	    if (refreshToken == null || !jwtUtil.isRefreshTokenValid(refreshToken)) {
-	        return ResponseEntity.status(401).body("만료 또는 사용할 수 없는 토큰입니다.");
-	    }
-	    /*
-		if (!jwtUtil.isRefreshTokenValid(refreshToken)) {
-			return ResponseEntity.status(401).body("만료 또는 사용할 수 없는 토큰입니다.");
-		}
-		*/
-		
-		// Refresh Token 검증 성공 -> 새로운 Access Token 발급
-		Claims claims = jwtUtil.parseToken(refreshToken);
-		String username = claims.get("username", String.class);
-		String userType = claims.get("userType", String.class);
-	    String tokenFamily = claims.get("tokenFamily", String.class);
-
-	    // 새 Access Token과 Refresh Token 생성
-	    String newAccessToken = jwtUtil.createAccessToken(username, userType, 1000L * 60 * 15);
-	    String newRefreshToken = jwtUtil.createRefreshToken(username, tokenFamily);
-
-	    // Access Token 생성 확인 로그 추가
-	    System.out.println("🛠️ New Access Token in Controller: " + newAccessToken);
-
-	    // 기존 Refresh Token 폐기
-	    jwtUtil.revokeRefreshToken(refreshToken);
-
-	    // Refresh Token을 쿠키에 저장
-	    ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", newRefreshToken)
-	            .httpOnly(true)
-	            .secure(true)
-	            .sameSite("Strict") // CSRF 방어 설정
-	            .path("/")
-	            .maxAge(24 * 60 * 60) // 24시간 유지
-	            .build();
-
-	    return ResponseEntity.ok()
-	            .header("Set-Cookie", refreshTokenCookie.toString())
-	            .body(Map.of("accessToken", newAccessToken));
-	}
-	
 	// 로그아웃 시 Redis의 RT 제거 API
 	@PostMapping("/logout")
-	public ResponseEntity<?> logout(@RequestHeader("Refresh-Token") String refreshToken) {
-		jwtUtil.revokeRefreshToken(refreshToken); // Redis의 RefreshToekn 삭제
-		return ResponseEntity.ok("로그아웃 성공!");
+	public ResponseEntity<?> logout(HttpServletRequest request, HttpServletResponse response) {
+		
+	    Cookie deleteCookie = new Cookie("refreshToken", null);
+	    deleteCookie.setHttpOnly(true);
+	    deleteCookie.setSecure(true);
+	    deleteCookie.setPath("/");
+	    deleteCookie.setMaxAge(0); // 쿠키 즉시 삭제
+	    response.addCookie(deleteCookie);
+
+	    // 헤더에서 Refresh Token 가져오기
+	    String refreshToken = request.getHeader("Refresh-Token");
+
+	    // Redis에서 Refresh Token 삭제
+	    if (refreshToken != null) {
+	        jwtUtil.revokeRefreshToken(refreshToken);
+	    }
+
+	    return ResponseEntity.ok("로그아웃 성공! Refresh Token 삭제 완료");
 	}
 }
 

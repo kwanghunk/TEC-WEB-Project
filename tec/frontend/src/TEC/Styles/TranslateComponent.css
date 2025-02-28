@@ -1,38 +1,54 @@
+/* 드롭다운 & 버튼 컨테이너 정렬 */
+.translate-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 85%; /* 부모 요소의 크기와 맞춤 */
+  margin: 0 auto; /* 가운데 정렬 */
+  margin-bottom: 5px;
+}
+
+/* 추가 기능 버튼 */
+.translate-btn-group {
+  display: flex;
+  gap: 10px;
+  white-space: nowrap;
+  margin-left: 10px;
+  justify-content: flex-end;
+  width: 100%;
+}
+
 /* 번역 버튼 */
-.translate-Btn {
-  font-family: 'Freesentation';
-  color: white;
+.translate-btn {
   background-color: #6841ea;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  padding: 8px 20px;
-  transition: background-color 0.3s ease;
-}
-
-.translate-Btn:hover {
-  background-color: rgb(255, 196, 0);
-}
-
-/* 개발언어 선택 드롭다운 */
-.select-language {
-  font-family: 'Freesentation';
   color: white;
-  background-color: #6841ea;
   border: none;
-  border-radius: 5px;
-  cursor: pointer;
   padding: 8px 16px;
+  border-radius: 5px;
+  font-size: 16px;
   transition: background-color 0.3s ease;
 }
 
+.translate-btn:hover {
+  background-color: #FFC107;
+}
+
+.select-language {
+  max-width: 200px;
+  background-color: #6841ea;
+  color: white;
+  border: none;
+  font-size: 16px;
+  transition: background-color 0.3s ease;
+}
 .select-language:hover {
-  background-color: rgb(255, 196, 0);
+  background-color: #FFC107;
 }
 
 /* 번역 영역 */
 .content-mid-translateDiv-left,
 .content-mid-translateDiv-right {
+  width: 85%;
   border: 2px solid lightgray;
   padding: 15px;
   border-radius: 10px;
@@ -40,15 +56,16 @@
   transition: border-color 0.3s ease;
 }
 
-/* 활성화된 번역 영역 */
+/* 번역 영역 정렬 */
+.content-mid-translateDiv-left {
+  margin-left: auto; /* 왼쪽 정렬 */
+}
+.content-mid-translateDiv-right {
+  margin-right: auto; /* 오른쪽 정렬 */
+}
+
+/* 영역 활성화 표시시 */
 .content-mid-translateDiv-left:focus-within,
 .content-mid-translateDiv-right:focus-within {
   border-color: #6841ea;
-}
-
-/* 경고 메시지 */
-.alert-danger {
-  background-color: #ffcccc;
-  color: #a94442;
-  font-weight: bold;
 }

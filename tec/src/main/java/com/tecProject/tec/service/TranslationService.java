@@ -57,16 +57,6 @@ public class TranslationService {
             return defaultValue;
         }
     }
-    
-    // a~z 태그로 검색
-	public List<Code> getByAlphabet(String alphabet) {
-		return translationRepository.findByOriginCodeStartingWith(alphabet);
-	}
-	// 키워드 검색 ** 완성된 키워드가 아닐 경우 입력된 키워드로 시작하는 데이터들 조회 **
-	public List<Code> getByKeyword(String keyword) {
-		return translationRepository.findByOriginCodeStartingWith(keyword);
-	}
-		
 		
 	
 

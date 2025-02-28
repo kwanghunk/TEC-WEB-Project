@@ -58,7 +58,7 @@ public class LoginControllerTest {
 
 	    when(loginService.authenticateUser(any(LoginDTO.class))).thenReturn(testUser);
 	    when(jwtUtil.createAccessToken(eq("testUser"), eq("ROLE_USER"), anyLong())).thenReturn(accessToken);
-	    when(jwtUtil.createRefreshToken(eq("testUser"), anyString())).thenReturn(refreshToken); // ✅ anyString()으로 수정
+	    when(jwtUtil.createRefreshToken(eq("testUser"), eq("ROLE_USER"), anyString())).thenReturn(refreshToken); // ✅ anyString()으로 수정
 	}
 	
 	@Test

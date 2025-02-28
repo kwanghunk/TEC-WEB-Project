@@ -1,0 +1,39 @@
+package com.tecProject.tec.domain;
+
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.LocalDateTime;
+
+@Data
+@Entity
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+@Table(name = "USER_ANSWER")
+public class UserAnswer {
+    
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "ANSWER_NO", nullable = false)
+    private int answerNo;
+
+    @Column(name = "INQUIRY_NO", nullable = false)
+    private int inquiryNo; // 어떤 문의글에 대한 답변인지
+
+    @Column(name = "PARENT_ANSWER_NO")
+    private Integer parentAnswerNo; // 부모 답변 번호 (NULL이면 최상위 답변)
+
+    @Column(name = "WRITER", nullable = false, length = 50)
+    private String writer; // 관리자 or 사용자
+
+    @Column(name = "CONTENT", columnDefinition = "TEXT", nullable = false)
+    private String content; // 답변 내용
+
+    @Column(name = "REPLY_DATE", nullable = false, updatable = false)
+    @CreatedDate
+    private LocalDateTime replyDate; // 답변 작성 시간
+}

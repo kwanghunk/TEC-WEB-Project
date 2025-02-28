@@ -61,7 +61,7 @@ public class RefreshTokenTest {
         // Mock 설정: Access Token이 정상적으로 생성되도록 보강
         when(jwtUtil.isRefreshTokenValid(validRefreshToken)).thenReturn(true);
         when(jwtUtil.createAccessToken(eq(testUsername), eq(testRole), anyLong())).thenReturn(validAccessToken);
-        when(jwtUtil.createRefreshToken(eq(testUsername), eq(tokenFamily))).thenReturn(validRefreshToken);
+        when(jwtUtil.createRefreshToken(eq(testUsername), eq(testRole), eq(tokenFamily))).thenReturn(validRefreshToken);
 
         when(jwtUtil.isRefreshTokenValid(expiredRefreshToken)).thenReturn(false);
         when(jwtUtil.isRefreshTokenValid(reusedRefreshToken)).thenReturn(false);

@@ -1,22 +1,14 @@
 package com.tecProject.tec.domain;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EntityListeners;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+
+import jakarta.persistence.*;
+import lombok.*;
 
 @Data
 @Entity
@@ -25,7 +17,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @EntityListeners(AuditingEntityListener.class)
 @Table(name = "USER_SUPPORT")
-
 public class UserSupport {
 	
 	//고객문의번호
@@ -46,17 +37,10 @@ public class UserSupport {
 		@Column(name = "CONTENT", columnDefinition = "TEXT")
 		private String content;
 		
-		//관리자 답변
-		@Column(name = "REPLY", columnDefinition = "TEXT")
-		private String reply;
-		
-		//관리자 답변 작성 일자
-		@Column(name = "REPLY_DATE")
-		private LocalDateTime replyDate;
-		
-		//문의 상태: 대기, 수정, 답변 완료
+		//문의 상태: 대기, 진행 중, 완료
 		@Column(name = "STATUS", nullable = false)
-		private String status;
+		@Enumerated(EnumType.STRING)
+		private InquiryStatus status;
 		
 		//생성일자
 		@Column(name = "CREATED_DATE", nullable = false, updatable = false)
@@ -80,6 +64,39 @@ public class UserSupport {
 		@Enumerated(EnumType.STRING)
 		private InquiryCategory category;
 		
+		//답글 계층필드
+	    @ManyToOne
+	    @JoinColumn(name = "PARENT_INQUIRY_NO") // 계층형 관계를 위한 부모 문의 번호
+	    private UserSupport parentInquiry;
+
+	    //답글 내용(리스트)
+	    @OneToMany(mappedBy = "parentInquiry", cascade = CascadeType.ALL, orphanRemoval = true)
+	    private List<UserSupport> replies;
+
+	    @PostLoad
+	    @PostPersist
+	    private void initReplies() {
+	        if (this.replies == null) {
+	            this.replies = new ArrayList<>();
+	        }
+	    }
+	    
+	    public enum InquiryStatus {
+	        WAITING("대기"),      
+	        IN_PROGRESS("진행 중"),   
+	        COMPLETED("완료");     
+	    	
+			private String description;
+			
+			InquiryStatus(String description) {
+				this.description = description;
+			}
+			
+			public String getDescription() {
+				return description;
+			}
+	    }		
+	    
 		public enum InquiryCategory {
 			GENERAL("일반 문의"),
 			PAYMENT("결제/환불 문의"),

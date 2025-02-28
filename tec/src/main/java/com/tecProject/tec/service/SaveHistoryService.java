@@ -7,9 +7,12 @@ import java.util.Optional;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import com.tecProject.tec.domain.SaveHistory;
+import com.tecProject.tec.domain.UserSupport;
+import com.tecProject.tec.domain.UserSupport.InquiryCategory;
 import com.tecProject.tec.dto.SaveHistoryDTO;
 import com.tecProject.tec.repository.SaveHistoryRepository;
 
@@ -68,12 +71,12 @@ public class SaveHistoryService {
 		if (existingHistory.isPresent()) {
 			SaveHistory historyDelete = existingHistory.get();
 			// 사용자 권한 확인
-			if (historyDelete.getUsername().trim().equalsIgnoreCase(username.trim())) {
+			if (historyDelete.getUsername().equalsIgnoreCase(username)) {
 				saveHistoryRepository.deleteById(saveHistoryNo); // 데이터 삭제
 				return true;
 			}
 		}
-		System.out.println("삭제 권한이 없습니다.");
+		System.out.println("삭제에 실패했습니다.");
 		return false; // 삭제 실패 (권한 없음 또는 데이터 없음)
 	}
 
@@ -110,6 +113,35 @@ public class SaveHistoryService {
 		return fileContent.toString();
 		}
 		throw new IllegalArgumentException("데이터가 없습니다.");
+	}
+
+	public Page<SaveHistoryDTO> getSavedHistories(String username, Pageable pageable, String searchType, String searchQuery) {
+		Page<SaveHistory> historyPage;
+        if (searchType != null && searchQuery != null) { 
+            switch (searchType) {
+                case "title":
+                    historyPage = saveHistoryRepository.findByUsernameAndHistoryTitleContaining(username, searchQuery, pageable);
+                    break;
+                case "content":
+                    historyPage = saveHistoryRepository.findByUsernameAndResponseCodeContaining(username, searchQuery, pageable);
+                    break;
+                case "all":
+                    historyPage = saveHistoryRepository.findByUsernameAndHistoryTitleContainingOrResponseCodeContaining(username, searchQuery, searchQuery, pageable);
+                    break;
+                default:
+                    historyPage = saveHistoryRepository.findByUsername(username, pageable);
+            }
+        } else if (searchQuery != null) { 
+            historyPage = saveHistoryRepository.findByUsernameAndHistoryTitleContainingOrResponseCodeContaining(username, searchQuery, searchQuery, pageable);
+        } else { 
+            historyPage = saveHistoryRepository.findByUsername(username, pageable);
+        }
+        return historyPage.map(history -> new SaveHistoryDTO(
+                history.getSaveHistoryNo(),
+                history.getUsername(),
+                history.getHistoryTitle(),
+                history.getSaveTime()
+        ));
 	}
 
 

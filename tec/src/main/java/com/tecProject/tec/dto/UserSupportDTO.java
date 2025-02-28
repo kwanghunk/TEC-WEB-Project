@@ -1,8 +1,12 @@
 package com.tecProject.tec.dto;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
+import com.tecProject.tec.domain.UserSupport;
 import com.tecProject.tec.domain.UserSupport.InquiryCategory;
+import com.tecProject.tec.domain.UserSupport.InquiryStatus;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -15,20 +19,20 @@ public class UserSupportDTO {
 	private Integer inquiryNo;
 	private String title;
 	private String content;
-	private String status;
+	private InquiryStatus status;
+	private String username;
 	private InquiryCategory category;
 	private LocalDateTime createDate;
 	private LocalDateTime modifiedDate;
 	private String isDeleted;
 	private LocalDateTime deletedDate;
-	private String reply;
-	private LocalDateTime replyDate;
+	private List<String> replies;
 	
 	// (사용자)문의 등록 생성자
-	public UserSupportDTO(String title, String content, String status, InquiryCategory category, String isDeleted) {
+	public UserSupportDTO(String title, String content, InquiryStatus inquiryStatus, InquiryCategory category, String isDeleted) {
 		this.title = title;
 		this.content = content;
-		this.status = status;
+		this.status = inquiryStatus;
 		this.category = category;
 		this.isDeleted = isDeleted;
 	}
@@ -46,24 +50,36 @@ public class UserSupportDTO {
 	}
 	
 	// (사용자)문의 조회 생성자
-	public UserSupportDTO(Integer inquiryNo, String status, InquiryCategory category, String title, LocalDateTime createDate) {
+	public UserSupportDTO(Integer inquiryNo, InquiryStatus inquiryStatus, InquiryCategory category, String title, LocalDateTime createDate) {
 		this.inquiryNo = inquiryNo;
-		this.status = status;
+		this.status = inquiryStatus;
 		this.title = title;
 		this.category = category;
 		this.createDate = createDate;
 	}
 	
 	// (사용자)문의 상세조회 생성자
-	public UserSupportDTO(Integer inquiryNo, String status, InquiryCategory category, String title, String content, LocalDateTime createDate, LocalDateTime modifiedDate, String reply, LocalDateTime replyDate) {
+	public UserSupportDTO(Integer inquiryNo, InquiryStatus inquiryStatus, InquiryCategory category, String title, String content, LocalDateTime createDate, LocalDateTime modifiedDate) {
 		this.inquiryNo = inquiryNo;
-		this.status = status;
+		this.status = inquiryStatus;
 		this.category = category;
 		this.title = title;
 		this.content = content;
 		this.createDate = createDate;
 		this.modifiedDate = modifiedDate;
-		this.reply = reply;
-		this.replyDate = replyDate;
 	}
+	
+    public UserSupportDTO(UserSupport inquiry) {
+        this.inquiryNo = inquiry.getInquiryNo();
+        this.title = inquiry.getTitle();
+        this.content = inquiry.getContent();
+        this.status = inquiry.getStatus();
+        this.username = inquiry.getUsername();
+        this.createDate = inquiry.getCreatedDate();
+        
+        // Lazy Loading 방지: replies를 String 리스트로 변환하여 미리 로딩
+        this.replies = inquiry.getReplies().stream()
+                .map(UserSupport::getContent)
+                .collect(Collectors.toList());
+    }
 }

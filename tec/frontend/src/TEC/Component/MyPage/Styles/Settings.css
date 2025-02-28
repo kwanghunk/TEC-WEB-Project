@@ -1,0 +1,18 @@
+/* Container 설정 */
+.settings-container {
+  position: relative;
+  height: 60vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 배경 이미지 */
+.settings-bg-img {
+  position: absolute;
+  width: 80%;
+  height: 80%;
+  object-fit: contain;
+  z-index: 0;
+}
+

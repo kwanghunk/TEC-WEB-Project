@@ -2,31 +2,43 @@ package com.tecProject.tec.repository;
 
 import java.util.List;
 
-import org.apache.ibatis.annotations.Param;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.tecProject.tec.domain.UserSupport;
 import com.tecProject.tec.domain.UserSupport.InquiryCategory;
-import com.tecProject.tec.dto.AdminSupportDTO;
+import com.tecProject.tec.domain.UserSupport.InquiryStatus;
 
 @Repository
 public interface SupportRepository extends JpaRepository<UserSupport, Integer> {
 
 	// 문의내역 전체조회(사용자)
-	List<UserSupport> findByUsernameAndIsDeleted(String username, String isDeleted);
+	List<UserSupport> findByUsernameAndIsDeletedAndParentInquiryIsNull(String username, String isDeleted);
 	
     // 제목 키워드로 삭제되지 않은 문의 조회
-    List<UserSupport> findByTitleContainingAndUsernameAndIsDeleted(String title, String username, String isDeleted);
+    List<UserSupport> findByTitleContainingAndUsernameAndIsDeletedAndParentInquiryIsNull(String title, String username, String isDeleted);
     
     // 문의내역 전체조회(관리자)
-    Page<UserSupport> findByCategoryAndTitleContainingAndIsDeleted(InquiryCategory category, String keyword, String isDeleted, Pageable pageable);
-    Page<UserSupport> findByCategoryAndIsDeleted(InquiryCategory category, String isDeleted, Pageable pageable);
-    Page<UserSupport> findByTitleContainingAndIsDeleted(String keyword, String isDeleted, Pageable pageable);
-	Page<UserSupport> findByIsDeleted(String string, Pageable pageable);
+	Page<UserSupport> findByStatusAndCategoryAndTitleContainingAndIsDeletedAndParentInquiryIsNull(InquiryStatus status, InquiryCategory category, String keyword, String isDeleted, Pageable pageable);
+	Page<UserSupport> findByStatusAndCategoryAndIsDeletedAndParentInquiryIsNull(InquiryStatus status, InquiryCategory category, String isDeleted, Pageable pageable);
+	Page<UserSupport> findByStatusAndTitleContainingAndIsDeletedAndParentInquiryIsNull(InquiryStatus status, String keyword, String isDeleted, Pageable pageable);
+    Page<UserSupport> findByCategoryAndTitleContainingAndIsDeletedAndParentInquiryIsNull(InquiryCategory category, String keyword, String isDeleted, Pageable pageable);
+    Page<UserSupport> findByStatusAndIsDeletedAndParentInquiryIsNull(InquiryStatus status, String isDeleted, Pageable pageable);
+    Page<UserSupport> findByCategoryAndIsDeletedAndParentInquiryIsNull(InquiryCategory category, String isDeleted, Pageable pageable);
+    Page<UserSupport> findByTitleContainingAndIsDeletedAndParentInquiryIsNull(String keyword, String isDeleted, Pageable pageable);
+	Page<UserSupport> findByIsDeletedAndParentInquiryIsNull(String string, Pageable pageable);
+
+    // 특정 부모 문의의 하위 답글 조회
+	//@Query("SELECT u FROM UserSupport u WHERE u.parentInquiry = :parentInquiry ORDER BY u.createdDate ASC")
+	List<UserSupport> findByParentInquiry(UserSupport reply);
+
+    // 특정 문의의 삭제되지 않은 하위 답변 조회 (isDeleted = 'N' 조건 추가)
+    @Query("SELECT u FROM UserSupport u WHERE u.parentInquiry.inquiryNo = :parentInquiryNo AND u.isDeleted = 'N' ORDER BY u.createdDate ASC")
+    List<UserSupport> findAllRepliesByParentInquiryNo(@Param("parentInquiryNo") int parentInquiryNo);
+	
 
 }

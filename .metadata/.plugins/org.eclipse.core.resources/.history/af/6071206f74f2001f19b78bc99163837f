@@ -1,0 +1,47 @@
+package com.tecProject.tec.dto.support;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+import com.tecProject.tec.domain.UserSupport;
+import com.tecProject.tec.domain.UserSupport.InquiryCategory;
+import com.tecProject.tec.domain.UserSupport.InquiryStatus;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class AdminSupportDetailDTO {
+    private int inquiryNo;        // 문의 번호
+    private String title;         // 문의 제목
+    private String content;       // 문의 내용
+    private InquiryCategory category; // 카테고리
+    private InquiryStatus status; // 문의 상태
+    private String isDeleted;     // 삭제 여부
+    private String username;      // 작성자
+    private LocalDateTime createdDate; // 작성일
+    private LocalDateTime modifiedDate; // 수정일
+    private List<AdminSupportDetailDTO> replies; // 답글 리스트 추가
+    
+    public static AdminSupportDetailDTO fromEntity(UserSupport entity) {
+        return AdminSupportDetailDTO.builder()
+                .inquiryNo(entity.getInquiryNo())
+                .title(entity.getTitle())
+                .content(entity.getContent())
+                .status(entity.getStatus())
+                .username(entity.getUsername())
+                .category(entity.getCategory())
+                .isDeleted(entity.getIsDeleted())
+                .createdDate(entity.getCreatedDate())
+                .modifiedDate(entity.getModifiedDate())
+                .build();
+    }
+
+}

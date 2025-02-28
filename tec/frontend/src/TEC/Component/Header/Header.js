@@ -1,48 +1,33 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Navbar, Nav, Button, Container } from "react-bootstrap";
 import { FaSearch } from "react-icons/fa";
 import "./Header.css";
 import FilterSearchModal from "../../HeaderParts/FilterSearchModal";
-import axiosInstance from "../../utils/FuncAxios";
+import axiosInstance, { setAccessToken } from "../../utils/FuncAxios";
 
-const TestHeader = ({ user, setUser }) => {
+const Header = ({ user, setUser }) => {
   const navigate = useNavigate();
   const [isModalOpen, setModalOpen] = useState(false); // 검색 모달 추가
   const [historys, setHistorys] = useState([]);
-  let accessToken = null; // 메모리에서만 유지
-
-  useEffect(() => {
-    if (!user) { // 로그인 상태 없을 시 /user/me 호출
-      axiosInstance
-        .get("/user/me", { withCredentials: true }) // 사용자 인증 확인
-        .then((res) => {
-          console.log("Header useEffect /user/me res: ", res); // 디버깅 로그
-          setUser(res.data.username);
-        })
-        .catch(() => {
-          setUser(null);
-        });
-    }
-  }, [user]);
 
   const handleLogout = async () => {
     try {
-      await axiosInstance.post("/user/logout", {}, { withCredentials: true }); // 서버에서 Refresh Token 삭제
-      accessToken = null; // AT 메모리에서 삭제
-      sessionStorage.removeItem("translationHistory");
-      if (!sessionStorage.getItem("translationHistory")) { setHistorys([]); }
+      await axiosInstance.post("/user/logout", { withCredentials: true }); // 서버에서 Refresh Token 삭제
+      sessionStorage.clear();
       setUser(null);
+      setAccessToken(null);
+      setHistorys([]);
       alert("로그아웃 되었습니다!");
-      navigate("/");
-    } catch (error) {
-      console.error("로그아웃 실패:", error);
+      window.location.href = "/";
+    } catch (e) {
+      console.error("로그아웃 실패:", e);
     }
   };
 
   return (
-    <Navbar expand="lg" style={{ backgroundColor: "#6841EA", color: "#FFFFFF" }}>
-      <Container>
+    <Navbar style={{ backgroundColor: "#6841EA", color: "#FFFFFF" }}>
+      <Container fluid className="header-container mt-4">
 
         {/* 로고 */}
         <Navbar.Brand onClick={() => navigate("/")} style={{ cursor: "pointer", color: "#FFFFFF", fontWeight: "bold" }}>
@@ -66,16 +51,16 @@ const TestHeader = ({ user, setUser }) => {
         {/* 로그인 / 로그아웃 */}
         {user ? (
           <div>
-            <span style={{ color: "#FFFFFF", marginRight: "10px" }}>{user}님</span>
-            <Button variant="outline-light" size="sm" className="ms-2" onClick={() => navigate("/User/MyPage")}>
+            <span style={{ color: "#FFFFFF", marginRight: "10px" }}>{user?.username}님</span>
+            <Button variant="outline-light" className="ms-2" onClick={() => navigate("/User/MyPage")}>
               마이페이지
             </Button>
-            <Button variant="outline-light" size="sm" className="ms-2" onClick={handleLogout}>
+            <Button variant="outline-light" className="ms-2" onClick={handleLogout}>
               로그아웃
             </Button>
           </div>
         ) : (
-          <Button variant="light" size="sm" onClick={() => navigate("/Login")}>
+          <Button variant="light" onClick={() => navigate("/Login")}>
             로그인
           </Button>
         )}
@@ -84,4 +69,4 @@ const TestHeader = ({ user, setUser }) => {
   );
 };
 
-export default TestHeader;
+export default Header;

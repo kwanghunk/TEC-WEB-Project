@@ -1,0 +1,101 @@
+package com.tecProject.tec.domain;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+
+import jakarta.persistence.*;
+import lombok.*;
+
+@Data
+@Entity
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+@Table(name = "USER_SUPPORT")
+public class UserSupport {
+	
+	//고객문의번호
+	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "INQUIRY_NO", nullable = false)
+	private int inquiryNo;
+	
+		//회원 ID
+		@Column(name = "USER_NAME", nullable = false, length = 50)
+		private String username;
+		
+		//문의글 제목
+		@Column(name = "TITLE", nullable = false, length = 100)
+		private String title;
+		
+		//문의 내용
+		@Column(name = "CONTENT", columnDefinition = "TEXT")
+		private String content;
+		
+		//문의 상태: 대기, 진행 중, 완료
+		@Column(name = "STATUS", nullable = false)
+		private String status;
+		
+		//생성일자
+		@Column(name = "CREATED_DATE", nullable = false, updatable = false)
+		@CreatedDate
+		private LocalDateTime createdDate;
+		
+		//수정 일자
+		@Column(name = "MODIFIED_DATE")
+		private LocalDateTime modifiedDate;
+		
+		//글 삭제여부
+		@Column(name = "IS_DELETED", nullable = false, length = 2)
+		private String isDeleted;
+		
+		//글 삭제일자
+		@Column(name = "DELETED_DATE")
+		private LocalDateTime deletedDate;
+		
+		//카테고리 타입
+		@Column(name = "CATEGORY", nullable = false)
+		@Enumerated(EnumType.STRING)
+		private InquiryCategory category;
+		
+		//답글 계층필드
+	    @ManyToOne
+	    @JoinColumn(name = "PARENT_INQUIRY_NO") // 계층형 관계를 위한 부모 문의 번호
+	    private UserSupport parentInquiry;
+
+	    //답글 내용(리스트)
+	    @OneToMany(mappedBy = "parentInquiry", cascade = CascadeType.ALL, orphanRemoval = true)
+	    private List<UserSupport> replies;
+
+	    @PostLoad
+	    @PostPersist
+	    private void initReplies() {
+	        if (this.replies == null) {
+	            this.replies = new ArrayList<>();
+	        }
+	    }
+		
+		public enum InquiryCategory {
+			GENERAL("일반 문의"),
+			PAYMENT("결제/환불 문의"),
+			ACCOUNT_SUPPORT("계정 문의"),
+			TECH_SUPPORT("기술 지원"),
+			FEEDBACK("제안 및 피드백"),
+			OTHER("기타");
+			
+			private String description;
+			
+			InquiryCategory(String description) {
+				this.description = description;
+			}
+			
+			public String getDescription() {
+				return description;
+			}
+		}
+}

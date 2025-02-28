@@ -1,14 +1,11 @@
 package com.tecProject.tec.auth;
 
-import java.util.Collection;
-import java.util.Iterator;
 import java.util.UUID;
 
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.tecProject.tec.dto.CustomUserDetails;
@@ -49,7 +46,7 @@ public class LoginFilter extends UsernamePasswordAuthenticationFilter{
 		// AT, RT 생성
 		String tokenFamily = UUID.randomUUID().toString(); // tokenFamily(고유ID)
 		String accessToken = jwtUtil.createAccessToken(username, userType, 1000L * 60 * 15); // 15분
-		String refreshToken = jwtUtil.createRefreshToken(username, tokenFamily);
+		String refreshToken = jwtUtil.createRefreshToken(username, userType, tokenFamily);
 		
 		response.addHeader("Authorization", "Bearer " + accessToken);
 		response.addHeader("Refresh-Token", refreshToken);

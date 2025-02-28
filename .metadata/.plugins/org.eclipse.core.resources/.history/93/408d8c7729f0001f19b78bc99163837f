@@ -1,0 +1,5 @@
+package com.tecProject.tec.dto.support;
+
+public class AdminSupportSearchDTO {
+
+}

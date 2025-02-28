@@ -13,7 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 public class RequestThrottleFilter implements Filter {
 	
-	private static final int MAX_REQUESTS = 5;
+	private static final int MAX_REQUESTS = 10;
 	private static final long TIME_WINDOW_MS = 60 * 1000;
 	private final ConcurrentHashMap<String, AtomicInteger> requestCounts = new ConcurrentHashMap<>();
 	private final ConcurrentHashMap<String, Long> requestTimestamps = new ConcurrentHashMap<>();

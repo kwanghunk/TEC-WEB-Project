@@ -55,7 +55,7 @@ public class JwtUtilTest {
         // 토큰 생성
         tokenFamily = UUID.randomUUID().toString();
         accessToken = jwtUtil.createAccessToken(testUsername, testRole, 1000L * 60 * 15); // 15분
-        refreshToken = jwtUtil.createRefreshToken(testUsername, tokenFamily);
+        refreshToken = jwtUtil.createRefreshToken(testUsername, testRole, tokenFamily);
     }
 
     @Test
@@ -75,7 +75,7 @@ public class JwtUtilTest {
 
     @Test
     void testCreateRefreshToken() {
-        refreshToken = jwtUtil.createRefreshToken(testUsername, tokenFamily);
+        refreshToken = jwtUtil.createRefreshToken(testUsername, testRole, tokenFamily);
         assertNotNull(refreshToken);
 
         // Redis 저장 검증 수정 (times(1) → atLeastOnce())

@@ -1,0 +1,189 @@
+package com.tecProject.tec.service;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.tecProject.tec.domain.UserSupport;
+import com.tecProject.tec.domain.UserSupport.InquiryCategory;
+import com.tecProject.tec.domain.UserSupport.InquiryStatus;
+import com.tecProject.tec.dto.UserSupportDTO;
+import com.tecProject.tec.dto.support.UserSupportWriteDTO;
+import com.tecProject.tec.repository.SupportRepository;
+
+@Service
+@Transactional
+public class SupportService {
+	
+	private final SupportRepository supportRepository;
+    
+	public SupportService(SupportRepository supportRepository) {
+		this.supportRepository = supportRepository; 
+	}
+
+	// 문의 등록
+	public UserSupportWriteDTO createInquiry(UserSupportWriteDTO userSupportDTO, String username) {
+		UserSupport userSupport = new UserSupport();
+		userSupport.setUsername(username); // 사용자 ID
+		userSupport.setTitle(userSupportDTO.getTitle()); // 문의 제목
+		userSupport.setContent(userSupportDTO.getContent()); // 문의 내용
+		userSupport.setCategory(userSupportDTO.getCategory()); // 카테고리
+		userSupport.setCreatedDate(LocalDateTime.now()); // 작성시간
+		userSupport.setStatus(InquiryStatus.WAITING); // 기본 상태 설정
+		userSupport.setIsDeleted("N"); // 삭제 여부 기본값
+		UserSupport savedInquiry = supportRepository.save(userSupport);
+		return new UserSupportWriteDTO(savedInquiry.getTitle(), savedInquiry.getContent(), 
+				savedInquiry.getStatus(), savedInquiry.getCategory(), savedInquiry.getIsDeleted());
+	}
+
+	// 문의 수정
+	public Optional<UserSupport> updateInquiry(int inquiryNo, String username, String title, String content, InquiryCategory category) {
+		Optional<UserSupport> existingInquiry = supportRepository.findById(inquiryNo);
+	    if (existingInquiry.isEmpty()) {
+	        return Optional.empty(); // 문의 없음
+	    }
+
+	    UserSupport inquiry = existingInquiry.get();
+
+	    // 사용자 권한 확인
+	    if (!inquiry.getUsername().equals(username)) {
+	        throw new SecurityException("수정 권한이 없습니다."); // 권한 문제 시 예외 발생
+	    }
+        inquiry.setTitle(title);
+        inquiry.setContent(content);
+        inquiry.setCategory(category);
+        inquiry.setModifiedDate(LocalDateTime.now());
+		
+		return Optional.of(supportRepository.save(inquiry));
+	}
+
+    // 문의 삭제
+    public Optional<UserSupport> deleteInquiry(int inquiryNo, String username) {
+    	Optional<UserSupport> existingInquiry = supportRepository.findById(inquiryNo);
+    	if (existingInquiry.isPresent()) {
+    		UserSupport inquiryToDelete = existingInquiry.get();
+            // 사용자 권한 확인
+            if (!inquiryToDelete.getUsername().equals(username)) {
+                return Optional.empty(); // 권한 없음
+            }
+            // 삭제 상태 업데이트
+    		inquiryToDelete.setIsDeleted("Y"); // 삭제상태 "Y"로 업데이트
+    		inquiryToDelete.setDeletedDate(LocalDateTime.now()); 
+    		return Optional.of(supportRepository.save(inquiryToDelete));
+    	}
+    	return Optional.empty();
+    }
+
+    // 문의내역 전체조회(사용자)
+	public List<UserSupport> getInquiryByUsername(String username) {
+		return supportRepository.findByUsernameAndIsDeleted(username, "N");
+	}
+	
+	// 문의내역 키워드 조회(사용자)
+    public List<UserSupport> getInquiriesByKeyword(String username, String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return supportRepository.findByUsernameAndIsDeleted(username, "N"); // 모든 문의 리스트 반환
+        }
+        return supportRepository.findByTitleContainingAndUsernameAndIsDeleted(keyword, username, "N"); // 키워드 기반 검색
+    }
+
+	// 문의내역 상세조회(사용자)
+    public Optional<UserSupport> getInquiryById(int inquiryNo, String username) {
+        Optional<UserSupport> inquiry = supportRepository.findById(inquiryNo);
+
+        if (inquiry.isPresent() && inquiry.get().getUsername().equals(username)) {
+            return inquiry; // 작성자 본인의 문의만 반환
+        }
+        return Optional.empty();
+    }
+
+    // 문의내역 답글 작성(작성자 || 관리자)
+	public UserSupportDTO addReply(int inquiryNo, String username, boolean isAdmin, String replyContent) {
+	    Optional<UserSupport> inquiryOpt = supportRepository.findById(inquiryNo);
+	    if (inquiryOpt.isPresent()) {
+	    	UserSupport inquiry = inquiryOpt.get();
+	        if ("Y".equals(inquiry.getIsDeleted())) {
+	            throw new IllegalStateException("삭제된 문의에는 답변을 작성할 수 없습니다.");
+	        }
+	        if (isAdmin || inquiry.getUsername().equals(username)) {
+	            UserSupport reply = UserSupport.builder()
+	                    .username(username)
+	                    .title("RE: " + inquiry.getTitle())  // 답글 제목 자동 생성
+	                    .content(replyContent)
+	                    .status(InquiryStatus.IN_PROGRESS) 
+	                    .createdDate(LocalDateTime.now())
+	                    .modifiedDate(LocalDateTime.now()) // ✅ 수정일 업데이트
+	                    .parentInquiry(inquiry) // 부모 문의 연결
+	                    .build();
+	            supportRepository.save(reply);
+
+	            return new UserSupportDTO(inquiry);
+	        }
+	    }
+	    return null;
+	}
+
+	// 문의내역 답글 수정(작성자 || 관리자)
+	public Optional<UserSupport> editReply(int replyNo, String username, String newContent) {
+        Optional<UserSupport> replyOpt = supportRepository.findById(replyNo);
+        if (replyOpt.isEmpty()) {
+            return Optional.empty();
+        }
+
+        UserSupport reply = replyOpt.get();
+
+        // 본인만 수정 가능
+        if (!reply.getUsername().equals(username)) {
+            return Optional.empty();
+        }
+        reply.setContent(newContent);
+        reply.setModifiedDate(LocalDateTime.now());
+        supportRepository.save(reply);
+        return Optional.of(reply);
+    }
+
+	// 문의내역 답글 삭제(작성자 || 관리자)
+    public boolean deleteReply(int replyNo, String username) {
+        Optional<UserSupport> replyOpt = supportRepository.findById(replyNo);
+        if (replyOpt.isEmpty()) {
+            return false;
+        }
+
+        UserSupport reply = replyOpt.get();
+
+        // 본인만 삭제 가능
+        if (!reply.getUsername().equals(username)) {
+            return false;
+        }
+        
+        // 하위 답글 먼저 삭제
+        List<UserSupport> childReplies = supportRepository.findByParentInquiry(reply);
+        supportRepository.deleteAll(childReplies);
+        
+        // 부모 답글도 삭제
+        supportRepository.delete(reply);
+        return true;
+    }
+    
+    // 문의내역 상태 업데이트
+    public boolean completeInquiry(int inquiryNo, String username, boolean isAdmin) {
+        Optional<UserSupport> inquiryOpt = supportRepository.findById(inquiryNo);
+        if (inquiryOpt.isEmpty()) {
+            return false;
+        }
+
+        UserSupport inquiry = inquiryOpt.get();
+
+        // 작성자 또는 관리자만 상태 변경 가능
+        if (!inquiry.getUsername().equals(username) && !isAdmin) {
+            return false;
+        }
+
+        inquiry.setStatus(InquiryStatus.COMPLETED);
+        supportRepository.save(inquiry);
+        return true;
+    }
+}
