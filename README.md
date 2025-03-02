@@ -36,7 +36,8 @@
 ---
 
 ## 🔥 주요 기능
-<img src="https://github.com/user-attachments/assets/0b09eb8e-a7f5-4416-944a-0046efc1bf85" width="400px" height="300px">
+<img src="https://github.com/user-attachments/assets/86ee3e67-b88d-4e37-8575-e9a29f7c20aa" width="400px" height="300px">
+
 
 ### 🏠 메인 기능: 코드 번역
 - 사용자가 **입력한 코드** 또는 **파일 업로드**를 통해 **코드를 번역**
